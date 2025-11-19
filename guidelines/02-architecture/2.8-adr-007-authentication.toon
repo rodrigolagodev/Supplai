@@ -1,0 +1,316 @@
+metadata:
+  id: arch-adr-007
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: proj-stack,proj-entities
+
+content:
+  title: "ADR-007: Authentication and Multi-tenancy"
+  purpose: Document the authentication method and multi-tenant user model.
+
+  sections[4]:
+    - id: arch-adr-007-auth
+      title: Authentication Method
+      status: Accepted
+      date: 2025-11-18
+
+      context: |
+        Users need to authenticate to create orders and manage suppliers.
+        Target users are restaurant staff in Latin America.
+        Must balance security with ease of use.
+
+      decision: Use Supabase Auth with Email + Password as the only authentication method.
+
+      rationale[4]:
+        - Familiar pattern for all users
+        - No external dependencies (Google, phone carriers)
+        - Full control over user experience
+        - Supabase handles security (hashing, sessions)
+
+      consequences:
+        positive[3]:
+          - Universal accessibility (only needs email)
+          - Predictable user experience
+          - Simple implementation
+        negative[2]:
+          - Users must remember password
+          - Requires password reset flow
+
+      alternatives[3]:
+        - id: arch-adr-007-alt-magic
+          name: Magic Link
+          rejected: true
+          reason: "Requires email access each login - inconvenient in busy kitchen"
+        - id: arch-adr-007-alt-oauth
+          name: Google OAuth
+          rejected: true
+          reason: "Not all users have Google accounts"
+        - id: arch-adr-007-alt-phone
+          name: Phone OTP
+          rejected: true
+          reason: "SMS costs, carrier issues in some LATAM regions"
+
+    - id: arch-adr-007-multitenancy
+      title: Multi-tenant Model
+      status: Accepted
+      date: 2025-11-18
+
+      context: |
+        Restaurants may have multiple staff members who need to create and view orders.
+        Need to support team collaboration while keeping data isolated between businesses.
+
+      decision: Implement organization-based multi-tenancy with shared data.
+
+      model:
+        description: Organization-centric data model
+        diagram: |
+          User (auth.users)
+            │
+            └── N:M ── Organization (via memberships)
+                          │
+                          ├── 1:N ── Supplier
+                          │
+                          └── 1:N ── Order
+                                       │
+                                       └── 1:N ── OrderItem
+
+      entities:
+        - id: arch-adr-007-entity-org
+          name: Organization
+          description: A restaurant or business that uses the system
+          fields[6]:
+            - name: id
+              type: UUID
+              required: true
+            - name: name
+              type: string
+              required: true
+              maxLength: 200
+              description: Business name
+            - name: slug
+              type: string
+              required: true
+              unique: true
+              description: URL-friendly identifier
+            - name: created_at
+              type: timestamp
+              required: true
+            - name: updated_at
+              type: timestamp
+              required: true
+            - name: created_by
+              type: UUID
+              reference: auth.users.id
+              description: User who created the organization
+
+        - id: arch-adr-007-entity-membership
+          name: Membership
+          description: Links users to organizations with roles
+          fields[5]:
+            - name: id
+              type: UUID
+              required: true
+            - name: user_id
+              type: UUID
+              required: true
+              reference: auth.users.id
+            - name: organization_id
+              type: UUID
+              required: true
+              reference: organizations.id
+            - name: role
+              type: enum
+              required: true
+              values[2]: admin,member
+              default: member
+            - name: joined_at
+              type: timestamp
+              required: true
+
+        - id: arch-adr-007-entity-invitation
+          name: Invitation
+          description: Pending invitations to join an organization
+          fields[7]:
+            - name: id
+              type: UUID
+              required: true
+            - name: organization_id
+              type: UUID
+              required: true
+              reference: organizations.id
+            - name: email
+              type: string
+              required: true
+              format: email
+            - name: role
+              type: enum
+              required: true
+              values[2]: admin,member
+              default: member
+            - name: invited_by
+              type: UUID
+              required: true
+              reference: auth.users.id
+            - name: expires_at
+              type: timestamp
+              required: true
+              description: Invitation valid for 7 days
+            - name: accepted_at
+              type: timestamp
+              required: false
+
+      roles[2]:
+        - id: arch-adr-007-role-admin
+          name: admin
+          permissions[6]:
+            - Manage organization settings
+            - Invite and remove members
+            - Manage all suppliers
+            - Create and send orders
+            - View all orders
+            - Delete organization
+        - id: arch-adr-007-role-member
+          name: member
+          permissions[4]:
+            - View suppliers
+            - Create and edit own orders
+            - Send orders
+            - View all orders
+
+      dataSharing: |
+        All data within an organization is shared:
+        - All members see the same suppliers
+        - All members see all orders (regardless of creator)
+        - Orders track created_by for audit purposes
+
+    - id: arch-adr-007-flows
+      title: Authentication Flows
+      flows[5]:
+        - id: arch-adr-007-flow-register
+          name: Registration
+          steps[5]:
+            - User enters email and password
+            - System creates auth.users record
+            - System creates organization with user as admin
+            - System creates membership (user + org + admin role)
+            - User redirected to dashboard
+
+        - id: arch-adr-007-flow-login
+          name: Login
+          steps[4]:
+            - User enters email and password
+            - Supabase validates credentials
+            - Session cookie set
+            - Redirect to dashboard (default org) or org selector (if multiple)
+
+        - id: arch-adr-007-flow-invite
+          name: Invitation
+          steps[6]:
+            - Admin enters email and role
+            - System creates invitation record
+            - System sends email with invite link
+            - Invitee clicks link, registers or logs in
+            - System creates membership
+            - Invitee sees organization data
+
+        - id: arch-adr-007-flow-reset
+          name: Password Reset
+          steps[4]:
+            - User requests reset with email
+            - System sends reset link
+            - User sets new password
+            - Redirect to login
+
+        - id: arch-adr-007-flow-switch-org
+          name: Organization Switch
+          steps[2]:
+            - User selects organization from list
+            - App context switches to selected org
+
+    - id: arch-adr-007-implementation
+      title: Implementation Patterns
+      patterns[3]:
+        - id: arch-adr-007-pattern-context
+          name: Organization Context
+          description: Track current organization in app state
+          pattern:
+            code: |
+              // Context for current organization
+              interface OrgContext {
+                organization: Organization
+                membership: Membership
+                isAdmin: boolean
+              }
+
+              // All data queries include org filter
+              const { data } = await supabase
+                .from('suppliers')
+                .select('*')
+                .eq('organization_id', currentOrg.id)
+
+        - id: arch-adr-007-pattern-rls
+          name: RLS Policies
+          description: Row Level Security based on membership
+          pattern:
+            code: |
+              -- Helper function to check membership
+              CREATE OR REPLACE FUNCTION is_member_of(org_id UUID)
+              RETURNS BOOLEAN AS $$
+                SELECT EXISTS (
+                  SELECT 1 FROM memberships
+                  WHERE user_id = auth.uid()
+                  AND organization_id = org_id
+                );
+              $$ LANGUAGE sql SECURITY DEFINER;
+
+              -- Helper function to check admin role
+              CREATE OR REPLACE FUNCTION is_admin_of(org_id UUID)
+              RETURNS BOOLEAN AS $$
+                SELECT EXISTS (
+                  SELECT 1 FROM memberships
+                  WHERE user_id = auth.uid()
+                  AND organization_id = org_id
+                  AND role = 'admin'
+                );
+              $$ LANGUAGE sql SECURITY DEFINER;
+
+              -- Example: Suppliers policy
+              CREATE POLICY "members_can_view_suppliers"
+                ON suppliers FOR SELECT
+                USING (is_member_of(organization_id));
+
+              CREATE POLICY "admins_can_manage_suppliers"
+                ON suppliers FOR ALL
+                USING (is_admin_of(organization_id));
+
+        - id: arch-adr-007-pattern-invite-email
+          name: Invitation Email
+          description: Email sent to invite users
+          pattern:
+            code: |
+              const { error } = await resend.emails.send({
+                from: 'Pedidos <invites@pedidos.app>',
+                to: invitation.email,
+                subject: `${inviterName} te invitó a ${orgName}`,
+                react: InvitationEmail({
+                  inviterName,
+                  orgName,
+                  role: invitation.role,
+                  acceptUrl: `${APP_URL}/invitations/${invitation.id}`,
+                  expiresAt: invitation.expires_at,
+                }),
+              })
+
+      antiPatterns[2]:
+        - description: Querying without organization filter
+          code: |
+            // WRONG - returns data from all organizations
+            const { data } = await supabase.from('suppliers').select('*')
+
+        - description: Checking role in client without RLS
+          code: |
+            // WRONG - can be bypassed
+            if (user.role === 'admin') {
+              await supabase.from('suppliers').delete().eq('id', id)
+            }
+            // RLS should enforce this server-side

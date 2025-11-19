@@ -1,0 +1,71 @@
+metadata:
+  id: code-imports
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: Import Order
+  purpose: Define consistent import ordering for all TypeScript/JavaScript files.
+
+  sections[1]:
+    - id: code-imports-order
+      title: Import Order Rules
+      order[6]:
+        - position: 1
+          category: React and Next.js
+          examples[3]: react,next/navigation,next/image
+        - position: 2
+          category: External libraries
+          examples[3]: zod,date-fns,clsx
+        - position: 3
+          category: Internal absolute imports
+          examples[3]: "@/lib/supabase/client","@/components/ui/Button"
+        - position: 4
+          category: Relative imports
+          examples[2]: "./OrderItem","../utils"
+        - position: 5
+          category: Types
+          examples[2]: "type { Order }","type { SupplierCategory }"
+        - position: 6
+          category: Styles
+          examples[1]: "./styles.module.css"
+
+      pattern:
+        description: Complete import example
+        code: |
+          // 1. React and Next.js
+          import { useState, useEffect, type FC } from 'react';
+          import { useRouter } from 'next/navigation';
+          import Image from 'next/image';
+
+          // 2. External libraries
+          import { z } from 'zod';
+          import { format } from 'date-fns';
+          import { es } from 'date-fns/locale';
+
+          // 3. Internal absolute imports
+          import { createClient } from '@/lib/supabase/client';
+          import { Button } from '@/components/ui/Button';
+          import { cn } from '@/lib/utils';
+
+          // 4. Relative imports
+          import { OrderItem } from './OrderItem';
+          import { formatQuantity } from '../utils';
+
+          // 5. Types (can be inline with import or separate)
+          import type { Order, OrderItem as OrderItemType } from '@/types/order';
+
+          // 6. Styles
+          import styles from './OrderList.module.css';
+
+      antiPattern:
+        description: Disorganized imports
+        code: |
+          import { OrderItem } from './OrderItem'
+          import { useState } from 'react'
+          import { Button } from '@/components/ui/Button'
+          import { z } from 'zod'
+          import type { Order } from '@/types/order'
+          import { useRouter } from 'next/navigation'
+          // Completely random order - hard to scan

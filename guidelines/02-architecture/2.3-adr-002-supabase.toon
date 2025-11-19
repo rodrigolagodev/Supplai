@@ -1,0 +1,84 @@
+metadata:
+  id: arch-adr-002
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-stack
+
+content:
+  title: "ADR-002: Supabase as Unified Backend"
+  purpose: Document the decision to use Supabase for all backend services.
+
+  sections[1]:
+    - id: arch-adr-002-decision
+      title: Decision Record
+      status: Accepted
+      date: 2025-11-18
+
+      context: |
+        We need database, authentication, file storage, and serverless functions.
+        Options include building custom backend, using multiple services, or a unified platform.
+
+      decision: Use Supabase as the unified backend platform for database, auth, storage, and edge functions.
+
+      rationale[6]:
+        - Single platform reduces integration complexity
+        - PostgreSQL provides robust, feature-rich database
+        - Built-in Row Level Security for data isolation
+        - Auth with multiple providers out of the box
+        - Storage integrated with auth for secure file access
+        - Generous free tier for MVP development
+
+      consequences:
+        positive[5]:
+          - Faster development with integrated services
+          - Consistent APIs across all backend features
+          - Built-in realtime subscriptions (future use)
+          - Strong TypeScript support with generated types
+          - Active community and good documentation
+        negative[3]:
+          - Vendor lock-in (mitigated by standard PostgreSQL)
+          - Less control than custom backend
+          - Edge Function cold starts
+
+      alternatives[3]:
+        - id: arch-adr-002-alt-firebase
+          name: Firebase
+          rejected: true
+          reason: NoSQL less suitable for relational data, weaker free tier
+        - id: arch-adr-002-alt-custom
+          name: Custom backend (Express/Fastify)
+          rejected: true
+          reason: More development time, more infrastructure to manage
+        - id: arch-adr-002-alt-planetscale
+          name: PlanetScale + separate auth
+          rejected: true
+          reason: Multiple services to integrate and maintain
+
+      pattern:
+        description: Supabase client usage
+        code: |
+          // Server component - use server client
+          import { createClient } from '@/lib/supabase/server'
+
+          export default async function Page() {
+            const supabase = await createClient()
+            const { data } = await supabase.from('orders').select('*')
+            return <OrderList orders={data} />
+          }
+
+          // Client component - use browser client
+          'use client'
+          import { createClient } from '@/lib/supabase/client'
+
+          export function OrderForm() {
+            const supabase = createClient()
+            // Use for mutations and realtime
+          }
+      antiPattern:
+        description: Bypassing Supabase security
+        code: |
+          // NEVER expose service role key to client
+          const supabase = createClient(url, SUPABASE_SERVICE_ROLE_KEY)
+
+          // NEVER disable RLS without explicit reason
+          ALTER TABLE orders DISABLE ROW LEVEL SECURITY;

@@ -1,0 +1,52 @@
+metadata:
+  id: flow-deploy
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-stack
+
+content:
+  title: Deployment
+  purpose: Define deployment process and environment management.
+
+  sections[2]:
+    - id: flow-deploy-envs
+      title: Environments
+      environments[3]:
+        - name: Development
+          url: localhost:3000
+          branch: feature branches
+          purpose: Local development
+        - name: Preview
+          url: "*.vercel.app"
+          branch: PR branches
+          purpose: PR review and testing
+        - name: Production
+          url: pedidos.app
+          branch: main
+          purpose: Live users
+
+    - id: flow-deploy-process
+      title: Deployment Process
+      steps[4]:
+        - step: 1
+          name: Create PR
+          action: Push feature branch, create PR
+          triggers: Preview deployment
+        - step: 2
+          name: Review
+          action: Code review, testing
+          gates: Approval, CI pass
+        - step: 3
+          name: Merge
+          action: Squash and merge to main
+          triggers: Production deployment
+        - step: 4
+          name: Monitor
+          action: Check logs and metrics
+          rollback: Revert commit if issues
+      preDeployChecklist[5]:
+        - All tests passing
+        - Security audit completed
+        - Environment variables set
+        - Database migrations run
+        - Backup verified

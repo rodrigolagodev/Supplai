@@ -1,0 +1,93 @@
+metadata:
+  id: qual-performance
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: arch-adr-003
+
+content:
+  title: Performance Guidelines
+  purpose: Define performance targets and optimization patterns.
+
+  sections[3]:
+    - id: qual-perf-targets
+      title: Core Web Vitals Targets
+      metrics[3]:
+        - name: LCP (Largest Contentful Paint)
+          target: "< 2.5s"
+        - name: FID (First Input Delay)
+          target: "< 100ms"
+        - name: CLS (Cumulative Layout Shift)
+          target: "< 0.1"
+
+    - id: qual-perf-patterns
+      title: Optimization Patterns
+      items[4]:
+        - id: qual-perf-images
+          name: Image Optimization
+          pattern:
+            code: |
+              import Image from 'next/image'
+
+              <Image
+                src="/hero.jpg"
+                alt="Descripción"
+                width={800}
+                height={600}
+                priority // For above-the-fold
+              />
+          antiPattern:
+            code: |
+              <img src="/hero.jpg" /> // No optimization
+
+        - id: qual-perf-dynamic
+          name: Dynamic Imports
+          pattern:
+            code: |
+              import dynamic from 'next/dynamic'
+
+              const HeavyChart = dynamic(() => import('./HeavyChart'), {
+                loading: () => <Skeleton />,
+                ssr: false,
+              })
+
+        - id: qual-perf-queries
+          name: Database Queries
+          pattern:
+            code: |
+              // Select only needed columns
+              const { data } = await supabase
+                .from('orders')
+                .select('id, status, created_at')
+                .eq('user_id', user.id)
+
+              // Use indexes
+              CREATE INDEX idx_orders_user_status ON orders(user_id, status);
+          antiPattern:
+            code: |
+              // DON'T select everything
+              const { data } = await supabase.from('orders').select('*')
+
+        - id: qual-perf-caching
+          name: Caching Strategy
+          pattern:
+            code: |
+              // Static generation where possible
+              export const revalidate = 3600 // 1 hour
+
+              // Revalidate on mutation
+              import { revalidatePath } from 'next/cache'
+              await createOrder(...)
+              revalidatePath('/orders')
+
+    - id: qual-perf-rules
+      title: Performance Rules
+      do[4]:
+        - Use Server Components by default
+        - Lazy load below-the-fold content
+        - Create indexes for queried columns
+        - Minimize client-side JavaScript
+      dont[4]:
+        - Fetch data in useEffect when server can do it
+        - Use SELECT * in queries
+        - Load all data upfront
+        - Skip loading states

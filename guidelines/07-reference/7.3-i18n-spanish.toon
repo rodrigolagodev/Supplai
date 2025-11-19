@@ -1,0 +1,105 @@
+metadata:
+  id: ref-i18n
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-overview-users
+
+content:
+  title: Spanish Internationalization
+  purpose: Reference for Spanish UI text, messages, and formatting.
+
+  sections[3]:
+    - id: ref-i18n-labels
+      title: UI Labels
+      labels[20]:
+        - key: orders
+          value: Pedidos
+        - key: suppliers
+          value: Proveedores
+        - key: newOrder
+          value: Nuevo pedido
+        - key: dashboard
+          value: Panel
+        - key: save
+          value: Guardar
+        - key: cancel
+          value: Cancelar
+        - key: delete
+          value: Eliminar
+        - key: edit
+          value: Editar
+        - key: send
+          value: Enviar
+        - key: review
+          value: Revisar
+        - key: confirm
+          value: Confirmar
+        - key: back
+          value: Volver
+        - key: next
+          value: Siguiente
+        - key: loading
+          value: Cargando...
+        - key: search
+          value: Buscar
+        - key: filter
+          value: Filtrar
+        - key: settings
+          value: Configuración
+        - key: logout
+          value: Cerrar sesión
+        - key: profile
+          value: Perfil
+        - key: help
+          value: Ayuda
+
+    - id: ref-i18n-messages
+      title: Messages
+      messages[10]:
+        - key: orderCreated
+          value: Pedido creado exitosamente
+        - key: orderSent
+          value: Pedido enviado a los proveedores
+        - key: supplierAdded
+          value: Proveedor agregado
+        - key: confirmDelete
+          value: ¿Estás seguro de que deseas eliminar este elemento?
+        - key: noResults
+          value: No se encontraron resultados
+        - key: required
+          value: Este campo es requerido
+        - key: invalidEmail
+          value: Ingresa un email válido
+        - key: networkError
+          value: Error de conexión. Verifica tu internet.
+        - key: authRequired
+          value: Debes iniciar sesión para continuar
+        - key: unknownError
+          value: Ocurrió un error. Por favor, intenta de nuevo.
+
+    - id: ref-i18n-formatting
+      title: Formatting
+      patterns[3]:
+        - id: ref-i18n-format-date
+          type: Date
+          example: "18 de noviembre, 2025"
+          code: |
+            import { format } from 'date-fns'
+            import { es } from 'date-fns/locale'
+
+            format(date, "d 'de' MMMM, yyyy", { locale: es })
+
+        - id: ref-i18n-format-time
+          type: Time
+          example: "14:30"
+          code: |
+            format(date, 'HH:mm', { locale: es })
+
+        - id: ref-i18n-format-number
+          type: Number
+          example: "1.234,56"
+          code: |
+            new Intl.NumberFormat('es-LA', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2,
+            }).format(number)

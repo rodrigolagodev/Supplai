@@ -1,0 +1,121 @@
+metadata:
+  id: code-typescript
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: TypeScript Guidelines
+  purpose: Define TypeScript usage patterns for type safety and maintainability.
+
+  sections[4]:
+    - id: code-ts-strict
+      title: Strict Mode
+      config: |
+        {
+          "compilerOptions": {
+            "strict": true,
+            "noUncheckedIndexedAccess": true,
+            "noImplicitOverride": true
+          }
+        }
+
+    - id: code-ts-types
+      title: Type Definitions
+      items[4]:
+        - id: code-ts-types-interface
+          rule: Use interface for extensible objects
+          pattern:
+            code: |
+              interface User {
+                id: string
+                email: string
+              }
+
+              interface AdminUser extends User {
+                permissions: string[]
+              }
+
+        - id: code-ts-types-type
+          rule: Use type for unions and computed types
+          pattern:
+            code: |
+              type OrderStatus = 'draft' | 'review' | 'sent' | 'archived'
+              type OrderWithItems = Order & { items: OrderItem[] }
+          antiPattern:
+            code: |
+              // Don't use interface for unions
+              interface OrderStatus { /* can't do unions */ }
+
+        - id: code-ts-types-no-any
+          rule: Never use any, prefer unknown
+          pattern:
+            code: |
+              function processData(data: unknown) {
+                if (isOrder(data)) {
+                  // data is typed as Order
+                }
+              }
+          antiPattern:
+            code: |
+              function processData(data: any) { } // Loses type safety
+
+        - id: code-ts-types-guards
+          rule: Use type guards for runtime validation
+          pattern:
+            code: |
+              function isOrder(data: unknown): data is Order {
+                return (
+                  typeof data === 'object' &&
+                  data !== null &&
+                  'id' in data &&
+                  'status' in data
+                )
+              }
+
+    - id: code-ts-zod
+      title: Zod Validation
+      description: Use Zod for runtime validation with type inference
+      pattern:
+        code: |
+          import { z } from 'zod'
+
+          const OrderItemSchema = z.object({
+            product: z.string().min(1).max(200),
+            quantity: z.number().positive(),
+            unit: z.enum(['kg', 'g', 'units', 'dozen']),
+          })
+
+          type OrderItemInput = z.infer<typeof OrderItemSchema>
+
+          // In API route
+          const result = OrderItemSchema.safeParse(body)
+          if (!result.success) {
+            return Response.json({ error: result.error }, { status: 400 })
+          }
+          const item = result.data // Fully typed
+      antiPattern:
+        code: |
+          // Don't manually validate without types
+          if (typeof body.product !== 'string') { }
+          if (body.quantity < 0) { }
+          // Error-prone and no type inference
+
+    - id: code-ts-generics
+      title: Generics
+      pattern:
+        code: |
+          // API response wrapper
+          type ApiResponse<T> = {
+            data: T | null
+            error: string | null
+          }
+
+          async function fetchApi<T>(url: string): Promise<ApiResponse<T>> {
+            const response = await fetch(url)
+            const data = await response.json()
+            return { data, error: null }
+          }
+
+          // Usage
+          const { data } = await fetchApi<Order[]>('/api/orders')

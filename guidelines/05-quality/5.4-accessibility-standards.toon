@@ -1,0 +1,110 @@
+metadata:
+  id: qual-a11y
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-principles-zero-learning
+
+content:
+  title: Accessibility Standards
+  purpose: Define accessibility requirements for WCAG 2.1 AA compliance.
+
+  sections[2]:
+    - id: qual-a11y-requirements
+      title: Requirements
+      compliance: WCAG 2.1 AA
+      items[6]:
+        - id: qual-a11y-semantic
+          name: Semantic HTML
+          pattern:
+            code: |
+              <nav>
+                <ul>
+                  <li><a href="/orders">Pedidos</a></li>
+                </ul>
+              </nav>
+
+              <main>
+                <h1>Mis Pedidos</h1>
+                <section aria-label="Lista de pedidos">
+                  <article>...</article>
+                </section>
+              </main>
+          antiPattern:
+            code: |
+              <div class="nav">
+                <div onClick={...}>Pedidos</div>
+              </div>
+
+        - id: qual-a11y-forms
+          name: Form Labels
+          pattern:
+            code: |
+              <label htmlFor="product">Producto</label>
+              <input id="product" name="product" />
+
+              // Or implicit
+              <label>
+                Producto
+                <input name="product" />
+              </label>
+          antiPattern:
+            code: |
+              <input placeholder="Producto" /> // No label
+
+        - id: qual-a11y-buttons
+          name: Buttons vs Links
+          pattern:
+            code: |
+              // Actions use buttons
+              <button onClick={handleDelete}>Eliminar</button>
+
+              // Navigation uses links
+              <Link href="/orders/new">Nuevo Pedido</Link>
+          antiPattern:
+            code: |
+              <a onClick={handleDelete}>Eliminar</a> // Should be button
+
+        - id: qual-a11y-keyboard
+          name: Keyboard Navigation
+          pattern:
+            code: |
+              // Focus management
+              const inputRef = useRef<HTMLInputElement>(null)
+              useEffect(() => {
+                inputRef.current?.focus()
+              }, [])
+
+              // Tab order
+              <button tabIndex={0}>First</button>
+
+        - id: qual-a11y-aria
+          name: ARIA Labels
+          pattern:
+            code: |
+              <button aria-label="Cerrar modal">×</button>
+
+              <div role="status" aria-live="polite">
+                {isLoading ? 'Cargando...' : 'Listo'}
+              </div>
+
+        - id: qual-a11y-contrast
+          name: Color Contrast
+          rule: "Minimum 4.5:1 for normal text, 3:1 for large text"
+          pattern:
+            code: |
+              // Use Tailwind's accessible defaults
+              <p className="text-gray-900">High contrast</p>
+          antiPattern:
+            code: |
+              // Low contrast
+              <p className="text-gray-400">Hard to read</p>
+
+    - id: qual-a11y-checklist
+      title: Accessibility Checklist
+      items[6]:
+        - Semantic HTML elements used
+        - All images have alt text
+        - Forms have associated labels
+        - Keyboard navigation works
+        - Focus indicators visible
+        - Color contrast sufficient

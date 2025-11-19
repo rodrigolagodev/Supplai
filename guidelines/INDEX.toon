@@ -1,0 +1,200 @@
+metadata:
+  id: guidelines-index
+  version: 1.0
+  lastUpdated: 2025-11-18
+  description: "Index of all guidelines. Load specific guidelines on-demand using @path syntax."
+
+usage: |
+  This index allows progressive context loading. Instead of loading all guidelines,
+  Claude should:
+  1. Consult this index to find relevant guidelines by ID or topic
+  2. Load only the specific guideline needed using @guidelines/[path]
+  3. Reference guideline IDs for cross-linking
+
+  Example: For naming questions, load @guidelines/03-code-standards/3.1-naming-conventions.toon
+
+categories[7]:
+  - id: 01-project-foundation
+    name: Project Foundation
+    description: Core project context, principles, and domain knowledge
+    guidelines[4]:
+      - id: proj-overview
+        file: 1.1-project-overview.toon
+        title: Project Overview
+        topics[4]: mission,users,problem,solution
+      - id: proj-principles
+        file: 1.2-core-principles.toon
+        title: Core Principles
+        topics[5]: voice-first,zero-learning,human-review,unidirectional,reliability
+      - id: proj-stack
+        file: 1.3-tech-stack.toon
+        title: Tech Stack
+        topics[4]: nextjs,supabase,groq,gemini
+      - id: proj-entities
+        file: 1.4-domain-entities.toon
+        title: Domain Entities
+        topics[3]: supplier,order,order-item
+
+  - id: 02-architecture
+    name: Architecture
+    description: System architecture and Architecture Decision Records
+    guidelines[8]:
+      - id: arch-overview
+        file: 2.1-architecture-overview.toon
+        title: Architecture Overview
+        topics[3]: layers,data-flow,deployment
+      - id: arch-adr-001
+        file: 2.2-adr-001-app-router.toon
+        title: "ADR-001: App Router"
+        topics[2]: nextjs,routing
+      - id: arch-adr-002
+        file: 2.3-adr-002-supabase.toon
+        title: "ADR-002: Supabase Backend"
+        topics[3]: database,auth,storage
+      - id: arch-adr-003
+        file: 2.4-adr-003-server-components.toon
+        title: "ADR-003: Server Components"
+        topics[2]: react,rendering
+      - id: arch-adr-004
+        file: 2.5-adr-004-gemini.toon
+        title: "ADR-004: Gemini Parsing"
+        topics[3]: llm,parsing,ai
+      - id: arch-adr-005
+        file: 2.6-adr-005-groq.toon
+        title: "ADR-005: Groq Whisper"
+        topics[3]: stt,voice,transcription
+      - id: arch-adr-006
+        file: 2.7-adr-006-email-mvp.toon
+        title: "ADR-006: Email MVP"
+        topics[2]: email,delivery
+      - id: arch-adr-007
+        file: 2.8-adr-007-authentication.toon
+        title: "ADR-007: Authentication"
+        topics[4]: auth,multitenancy,roles,invitations
+
+  - id: 03-code-standards
+    name: Code Standards
+    description: Naming conventions, organization, TypeScript, and formatting
+    guidelines[5]:
+      - id: code-naming
+        file: 3.1-naming-conventions.toon
+        title: Naming Conventions
+        topics[5]: files,variables,database,env,semantic
+      - id: code-organization
+        file: 3.2-file-organization.toon
+        title: File Organization
+        topics[3]: structure,components,routes
+      - id: code-typescript
+        file: 3.3-typescript-guidelines.toon
+        title: TypeScript Guidelines
+        topics[4]: types,interfaces,zod,generics
+      - id: code-formatting
+        file: 3.4-formatting-linting.toon
+        title: Formatting and Linting
+        topics[2]: prettier,eslint
+      - id: code-imports
+        file: 3.5-import-order.toon
+        title: Import Order
+        topics[1]: imports
+
+  - id: 04-patterns
+    name: Patterns
+    description: Implementation patterns for React, Supabase, AI, and errors
+    guidelines[4]:
+      - id: pat-react
+        file: 4.1-react-nextjs-patterns.toon
+        title: React/Next.js Patterns
+        topics[4]: server-components,client-components,actions,hooks
+      - id: pat-supabase
+        file: 4.2-supabase-patterns.toon
+        title: Supabase Patterns
+        topics[3]: clients,queries,rls
+      - id: pat-ai
+        file: 4.3-ai-integration-patterns.toon
+        title: AI Integration Patterns
+        topics[3]: prompts,retry,confidence
+      - id: pat-errors
+        file: 4.4-error-handling-patterns.toon
+        title: Error Handling Patterns
+        topics[3]: user-errors,api-errors,logging
+
+  - id: 05-quality
+    name: Quality
+    description: Testing, security, performance, and accessibility standards
+    guidelines[4]:
+      - id: qual-testing
+        file: 5.1-testing-standards.toon
+        title: Testing Standards
+        topics[4]: coverage,unit,integration,e2e
+      - id: qual-security
+        file: 5.2-security-standards.toon
+        title: Security Standards
+        topics[4]: validation,auth,owasp,rls
+      - id: qual-performance
+        file: 5.3-performance-guidelines.toon
+        title: Performance Guidelines
+        topics[3]: web-vitals,optimization,caching
+      - id: qual-a11y
+        file: 5.4-accessibility-standards.toon
+        title: Accessibility Standards
+        topics[4]: wcag,aria,keyboard,contrast
+
+  - id: 06-workflow
+    name: Workflow
+    description: Git, PR, deployment, and definition of done
+    guidelines[4]:
+      - id: flow-git
+        file: 6.1-git-workflow.toon
+        title: Git Workflow
+        topics[3]: branches,commits,rules
+      - id: flow-pr
+        file: 6.2-pr-process.toon
+        title: PR Process
+        topics[2]: template,checklist
+      - id: flow-deploy
+        file: 6.3-deployment.toon
+        title: Deployment
+        topics[2]: environments,process
+      - id: flow-dod
+        file: 6.4-definition-of-done.toon
+        title: Definition of Done
+        topics[1]: checklist
+
+  - id: 07-reference
+    name: Reference
+    description: Quick reference for commands, paths, and Spanish i18n
+    guidelines[3]:
+      - id: ref-commands
+        file: 7.1-commands-cheatsheet.toon
+        title: Commands Cheatsheet
+        topics[4]: dev,test,supabase,git
+      - id: ref-paths
+        file: 7.2-paths-reference.toon
+        title: Paths Reference
+        topics[3]: src,config,testing
+      - id: ref-i18n
+        file: 7.3-i18n-spanish.toon
+        title: Spanish i18n
+        topics[3]: labels,messages,formatting
+
+quickLookup:
+  byTopic:
+    naming: code-naming
+    typescript: code-typescript
+    components: pat-react
+    database: pat-supabase
+    auth: arch-adr-007
+    multitenancy: arch-adr-007
+    roles: arch-adr-007
+    invitations: arch-adr-007
+    testing: qual-testing
+    ai: pat-ai
+    voice: arch-adr-005
+    parsing: arch-adr-004
+    errors: pat-errors
+    security: qual-security
+    performance: qual-performance
+    accessibility: qual-a11y
+    git: flow-git
+    deployment: flow-deploy
+    i18n: ref-i18n

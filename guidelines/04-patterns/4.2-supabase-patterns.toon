@@ -1,0 +1,126 @@
+metadata:
+  id: pat-supabase
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: arch-adr-002
+
+content:
+  title: Supabase Patterns
+  purpose: Define patterns for Supabase client usage, queries, and security.
+
+  sections[3]:
+    - id: pat-supa-clients
+      title: Client Creation
+      items[2]:
+        - id: pat-supa-clients-server
+          name: Server Client
+          when: Server Components, API routes, Server Actions
+          pattern:
+            code: |
+              // lib/supabase/server.ts
+              import { createServerClient } from '@supabase/ssr'
+              import { cookies } from 'next/headers'
+
+              export async function createClient() {
+                const cookieStore = await cookies()
+                return createServerClient(
+                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                  {
+                    cookies: {
+                      getAll: () => cookieStore.getAll(),
+                      setAll: (cookies) => cookies.forEach(c =>
+                        cookieStore.set(c.name, c.value, c.options)
+                      ),
+                    },
+                  }
+                )
+              }
+
+        - id: pat-supa-clients-browser
+          name: Browser Client
+          when: Client Components, real-time subscriptions
+          pattern:
+            code: |
+              // lib/supabase/client.ts
+              import { createBrowserClient } from '@supabase/ssr'
+
+              export function createClient() {
+                return createBrowserClient(
+                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                )
+              }
+
+    - id: pat-supa-queries
+      title: Query Patterns
+      items[3]:
+        - id: pat-supa-queries-select
+          name: Select with Relations
+          pattern:
+            code: |
+              const { data } = await supabase
+                .from('orders')
+                .select(`
+                  *,
+                  order_items (
+                    *,
+                    supplier:suppliers (id, name, email)
+                  )
+                `)
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+          antiPattern:
+            code: |
+              // N+1 queries - AVOID
+              const orders = await getOrders()
+              for (const order of orders) {
+                order.items = await getItems(order.id)
+              }
+
+        - id: pat-supa-queries-insert
+          name: Insert with Return
+          pattern:
+            code: |
+              const { data, error } = await supabase
+                .from('orders')
+                .insert({ user_id: user.id, status: 'draft' })
+                .select()
+                .single()
+
+        - id: pat-supa-queries-update
+          name: Safe Update
+          pattern:
+            code: |
+              const { error } = await supabase
+                .from('orders')
+                .update({ status: 'sent', sent_at: new Date().toISOString() })
+                .eq('id', orderId)
+                .eq('user_id', user.id) // Extra safety even with RLS
+
+    - id: pat-supa-rls
+      title: Row Level Security
+      pattern:
+        code: |
+          -- Enable RLS
+          ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+
+          -- User can only see their own orders
+          CREATE POLICY "select_own" ON orders
+            FOR SELECT USING (auth.uid() = user_id);
+
+          -- User can only create for themselves
+          CREATE POLICY "insert_own" ON orders
+            FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+          -- User can only update their own
+          CREATE POLICY "update_own" ON orders
+            FOR UPDATE USING (auth.uid() = user_id)
+            WITH CHECK (auth.uid() = user_id);
+      antiPattern:
+        code: |
+          -- NEVER disable RLS
+          ALTER TABLE orders DISABLE ROW LEVEL SECURITY;
+
+          -- NEVER use service role key on client
+          const supabase = createClient(url, SERVICE_ROLE_KEY)

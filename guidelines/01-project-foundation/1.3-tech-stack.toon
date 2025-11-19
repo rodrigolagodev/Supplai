@@ -1,0 +1,99 @@
+metadata:
+  id: proj-stack
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: proj-overview,arch-adr-001
+
+content:
+  title: Tech Stack
+  purpose: Define all technologies used in Pedidos with versions, rationale, and configuration requirements.
+
+  sections[4]:
+    - id: proj-stack-requirements
+      title: Requirements
+      items[2]:
+        - id: proj-stack-req-node
+          name: Node.js
+          version: "20.9+"
+          rationale: LTS with native fetch and modern features
+        - id: proj-stack-req-typescript
+          name: TypeScript
+          version: "5+"
+          rationale: Strict typing for reliability
+
+    - id: proj-stack-core
+      title: Core Technologies
+      items[10]{name,version,purpose,rationale}:
+        Next.js,16,Frontend + API,"App Router, Server Components, best DX"
+        Tailwind CSS,4,Styling,"Utility-first, fast development, consistent design"
+        Supabase,latest,Backend Platform,"Unified DB/Auth/Storage/Functions, generous free tier"
+        PostgreSQL,15+,Database,"Reliable, feature-rich, excellent Supabase integration"
+        Supabase Auth,-,Authentication,"Built-in, secure, multiple providers"
+        Supabase Storage,-,File Storage,"Audio files, integrated with auth"
+        Groq Whisper,whisper-large-v3,Speech-to-Text,"Fastest inference, good Spanish accuracy"
+        Gemini,1.5-flash,LLM Parsing,"Cost-effective, fast, good Spanish support"
+        Resend,-,Email Delivery,"Simple API, good deliverability, generous free tier"
+        Vercel,-,Hosting,"Native Next.js support, edge functions, easy deploys"
+
+    - id: proj-stack-post-mvp
+      title: Post-MVP Technologies
+      items[2]{name,purpose,phase}:
+        Twilio,WhatsApp Business API,post-MVP
+        TBD,Analytics,post-MVP
+
+    - id: proj-stack-dev-tools
+      title: Development Tools
+      items[6]{name,purpose}:
+        ESLint,Code linting
+        Prettier,Code formatting
+        Vitest,Unit/Integration testing
+        Playwright,E2E testing
+        Zod,Runtime validation
+        date-fns,Date formatting
+
+  configuration:
+    - id: proj-stack-config-env
+      title: Environment Variables
+      required[8]:
+        - name: NEXT_PUBLIC_SUPABASE_URL
+          type: public
+          description: Supabase project URL
+        - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+          type: public
+          description: Supabase anonymous key
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          type: secret
+          description: Supabase service role (server only)
+        - name: GROQ_API_KEY
+          type: secret
+          description: Groq API key for Whisper
+        - name: GEMINI_API_KEY
+          type: secret
+          description: Google AI API key
+        - name: RESEND_API_KEY
+          type: secret
+          description: Resend email API key
+        - name: NEXT_PUBLIC_APP_URL
+          type: public
+          description: Application URL for callbacks
+        - name: NODE_ENV
+          type: system
+          description: "development | production"
+      pattern:
+        description: Store in .env.local, never commit
+        code: |
+          # .env.local (gitignored)
+          NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+          SUPABASE_SERVICE_ROLE_KEY=eyJ...
+          GROQ_API_KEY=gsk_...
+          GEMINI_API_KEY=AI...
+          RESEND_API_KEY=re_...
+      antiPattern:
+        description: Hardcode or commit secrets
+        code: |
+          // NEVER do this
+          const GROQ_KEY = 'gsk_abc123'
+
+          // Or commit .env files
+          // .gitignore missing .env.local

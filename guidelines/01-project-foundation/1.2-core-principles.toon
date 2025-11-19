@@ -1,0 +1,147 @@
+metadata:
+  id: proj-principles
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-overview
+
+content:
+  title: Core Principles
+  purpose: Define the fundamental principles that guide all design and development decisions in Pedidos.
+
+  sections[1]:
+    - id: proj-principles-list
+      title: Principles
+      items[5]:
+        - id: proj-principles-voice-first
+          name: Voice-First
+          priority: 1
+          description: Voice input is the primary interaction method
+          rationale: "Chefs have hands occupied, wet, or cold - typing is impractical"
+          implications[3]:
+            - Large touch targets for start/stop recording
+            - Visual feedback during recording
+            - Fallback to text always available
+          pattern:
+            description: Prominent voice button as main CTA
+            code: |
+              <VoiceRecorder
+                size="large"
+                className="fixed bottom-6 right-6"
+              />
+          antiPattern:
+            description: Text input as primary with small voice icon
+            code: |
+              <input type="text" />
+              <button className="text-xs">🎤</button>
+
+        - id: proj-principles-zero-learning
+          name: Zero Learning Curve
+          priority: 2
+          description: Users should be productive immediately without training
+          rationale: "Restaurant staff have no time for onboarding"
+          implications[3]:
+            - Minimal UI with obvious affordances
+            - No configuration required to start
+            - Progressive disclosure of advanced features
+          pattern:
+            description: Single action to start ordering
+            code: |
+              // Landing after login = immediate action
+              export default function Dashboard() {
+                return (
+                  <div>
+                    <h1>¿Qué necesitas pedir?</h1>
+                    <VoiceRecorder />
+                  </div>
+                )
+              }
+          antiPattern:
+            description: Complex setup wizard before first use
+            code: |
+              // Force configuration before any action
+              if (!hasCompletedSetup) {
+                return <SetupWizard steps={7} />
+              }
+
+        - id: proj-principles-human-review
+          name: Human Review Mandatory
+          priority: 3
+          description: AI assists but humans must approve before sending
+          rationale: "Orders have real consequences - wrong quantities cost money"
+          implications[3]:
+            - Always show review screen before send
+            - Allow editing of all AI-parsed data
+            - Highlight low-confidence items
+          pattern:
+            description: Explicit review step with edit capabilities
+            code: |
+              // Flow: Parse → Review → Confirm → Send
+              const [step, setStep] = useState<'input' | 'review' | 'sent'>('input')
+
+              // Cannot skip review
+              if (step === 'review') {
+                return <OrderReview items={items} onConfirm={send} />
+              }
+          antiPattern:
+            description: Auto-send after parsing
+            code: |
+              // NEVER do this
+              const parsed = await parseOrder(text)
+              await sendToSuppliers(parsed) // No review!
+
+        - id: proj-principles-unidirectional
+          name: Unidirectional Flow
+          priority: 4
+          description: Only sends orders - does not manage supplier responses
+          rationale: "Focused scope prevents feature creep and complexity"
+          implications[3]:
+            - No inbox or message thread UI
+            - No order confirmation tracking
+            - No supplier response handling
+          pattern:
+            description: Clear scope boundary
+            code: |
+              // Order statuses reflect OUR actions only
+              type OrderStatus = 'draft' | 'review' | 'sent' | 'archived'
+              // No 'confirmed' | 'delivered' | 'responded'
+          antiPattern:
+            description: Two-way communication features
+            code: |
+              // Out of scope
+              type OrderStatus =
+                | 'sent'
+                | 'supplier_viewed'      // No tracking
+                | 'supplier_confirmed'   // No confirmations
+                | 'delivered'            // No delivery status
+
+        - id: proj-principles-reliability
+          name: Reliability Over Features
+          priority: 5
+          description: Better to do less perfectly than more poorly
+          rationale: "Trust is built through consistent, predictable behavior"
+          implications[3]:
+            - Thorough error handling
+            - Graceful degradation
+            - Clear feedback for all states
+          pattern:
+            description: Handle all error states explicitly
+            code: |
+              try {
+                const result = await transcribe(audio)
+                return result
+              } catch (error) {
+                // Always provide actionable feedback
+                return {
+                  error: 'No se pudo transcribir. Intenta de nuevo o escribe el pedido.',
+                  fallback: 'text-input'
+                }
+              }
+          antiPattern:
+            description: Silent failures or generic errors
+            code: |
+              try {
+                return await transcribe(audio)
+              } catch {
+                // User has no idea what happened
+                console.error('Failed')
+              }

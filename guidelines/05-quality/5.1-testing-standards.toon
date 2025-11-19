@@ -1,0 +1,109 @@
+metadata:
+  id: qual-testing
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: Testing Standards
+  purpose: Define testing strategy, coverage requirements, and patterns.
+
+  sections[3]:
+    - id: qual-testing-coverage
+      title: Coverage Requirements
+      thresholds:
+        statements: 80%
+        branches: 75%
+        functions: 80%
+        lines: 80%
+      criticalPaths[4]:
+        - Authentication flows (100%)
+        - Order processing pipeline (100%)
+        - AI parsing logic (90%)
+        - Data validation (100%)
+
+    - id: qual-testing-patterns
+      title: Test Patterns
+      items[3]:
+        - id: qual-testing-unit
+          name: Unit Tests
+          framework: Vitest
+          pattern:
+            code: |
+              import { describe, it, expect } from 'vitest'
+              import { formatQuantity } from './formatQuantity'
+
+              describe('formatQuantity', () => {
+                it('formats whole numbers', () => {
+                  expect(formatQuantity(5, 'kg')).toBe('5 kg')
+                })
+
+                it('handles decimals', () => {
+                  expect(formatQuantity(1.5, 'kg')).toBe('1.5 kg')
+                })
+
+                it('handles zero', () => {
+                  expect(formatQuantity(0, 'units')).toBe('0 units')
+                })
+              })
+
+        - id: qual-testing-component
+          name: Component Tests
+          framework: React Testing Library
+          pattern:
+            code: |
+              import { render, screen, fireEvent } from '@testing-library/react'
+              import { OrderItem } from './OrderItem'
+
+              describe('OrderItem', () => {
+                it('renders product info', () => {
+                  render(<OrderItem product="Tomates" quantity={2} unit="kg" />)
+                  expect(screen.getByText('Tomates')).toBeInTheDocument()
+                  expect(screen.getByText('2 kg')).toBeInTheDocument()
+                })
+
+                it('calls onEdit when clicked', () => {
+                  const onEdit = vi.fn()
+                  render(<OrderItem id="1" onEdit={onEdit} />)
+                  fireEvent.click(screen.getByRole('button', { name: /editar/i }))
+                  expect(onEdit).toHaveBeenCalledWith('1')
+                })
+              })
+
+        - id: qual-testing-api
+          name: API Route Tests
+          pattern:
+            code: |
+              import { describe, it, expect, vi } from 'vitest'
+              import { POST } from './route'
+
+              describe('POST /api/orders', () => {
+                it('creates order for authenticated user', async () => {
+                  const request = new Request('http://test', {
+                    method: 'POST',
+                    body: JSON.stringify({ items: [...] }),
+                  })
+                  const response = await POST(request)
+                  expect(response.status).toBe(201)
+                })
+
+                it('returns 401 for unauthenticated', async () => {
+                  // Mock no user
+                  const response = await POST(request)
+                  expect(response.status).toBe(401)
+                })
+              })
+
+    - id: qual-testing-rules
+      title: Testing Rules
+      do[5]:
+        - Test behavior not implementation
+        - One assertion per test when possible
+        - Use descriptive test names
+        - Mock external dependencies
+        - Reset mocks between tests
+      dont[4]:
+        - Test third-party libraries
+        - Use hard-coded waits
+        - Share state between tests
+        - Skip tests without reason

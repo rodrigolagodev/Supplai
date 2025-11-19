@@ -1,0 +1,104 @@
+metadata:
+  id: arch-adr-005
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: proj-stack,proj-principles-voice-first
+
+content:
+  title: "ADR-005: Groq Whisper for Speech-to-Text"
+  purpose: Document the decision to use Groq's Whisper API for voice transcription.
+
+  sections[1]:
+    - id: arch-adr-005-decision
+      title: Decision Record
+      status: Accepted
+      date: 2025-11-18
+
+      context: |
+        Need fast, accurate speech-to-text for Spanish voice input.
+        Must work well in noisy kitchen environments.
+        User experience depends on quick transcription feedback.
+
+      decision: Use Groq's hosted Whisper (whisper-large-v3) for speech-to-text transcription.
+
+      rationale[5]:
+        - Fastest Whisper inference available (10x faster than OpenAI)
+        - High accuracy for Spanish transcription
+        - Large-v3 model handles accents and noise well
+        - Simple API, no infrastructure to manage
+        - Reasonable pricing for expected volume
+
+      consequences:
+        positive[4]:
+          - Sub-second transcription for typical orders
+          - Good accuracy even with background noise
+          - Segment-level confidence scores available
+          - Supports multiple audio formats
+        negative[3]:
+          - External dependency (service availability)
+          - Audio must be uploaded (bandwidth)
+          - 25MB file size limit
+
+      alternatives[3]:
+        - id: arch-adr-005-alt-openai
+          name: OpenAI Whisper API
+          rejected: true
+          reason: "Slower inference, similar pricing"
+        - id: arch-adr-005-alt-assembly
+          name: AssemblyAI
+          rejected: true
+          reason: "Higher cost, Spanish accuracy not significantly better"
+        - id: arch-adr-005-alt-browser
+          name: Web Speech API
+          rejected: true
+          reason: "Inconsistent browser support, lower accuracy, no confidence scores"
+
+      configuration:
+        model: whisper-large-v3
+        language: es
+        responseFormat: verbose_json
+        temperature: 0.0
+
+      pattern:
+        description: Transcription with confidence handling
+        code: |
+          import Groq from 'groq-sdk'
+
+          const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
+          async function transcribe(audioBuffer: Buffer): Promise<TranscriptionResult> {
+            const transcription = await groq.audio.transcriptions.create({
+              file: new File([audioBuffer], 'audio.webm', { type: 'audio/webm' }),
+              model: 'whisper-large-v3',
+              language: 'es',
+              response_format: 'verbose_json',
+              temperature: 0.0, // Deterministic
+            })
+
+            return {
+              text: transcription.text,
+              confidence: calculateAverageConfidence(transcription.segments),
+              duration: transcription.duration,
+            }
+          }
+
+          // Handle low confidence
+          if (result.confidence < 0.7) {
+            return {
+              text: result.text,
+              warning: 'Audio poco claro. Por favor, revisa el texto.',
+            }
+          }
+      antiPattern:
+        description: Poor audio handling patterns
+        code: |
+          // DON'T ignore audio quality issues
+          const result = await transcribe(audio)
+          return result.text // No confidence check!
+
+          // DON'T use browser STT as primary
+          const recognition = new webkitSpeechRecognition()
+          // Inconsistent, no confidence, poor Spanish
+
+          // DON'T skip error handling
+          const text = await transcribe(audio) // May throw!

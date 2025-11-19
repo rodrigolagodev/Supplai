@@ -1,0 +1,71 @@
+metadata:
+  id: code-formatting
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: Formatting and Linting
+  purpose: Define code formatting and linting configuration for consistent code style.
+
+  sections[2]:
+    - id: code-format-prettier
+      title: Prettier Configuration
+      file: .prettierrc
+      config: |
+        {
+          "semi": true,
+          "singleQuote": true,
+          "tabWidth": 2,
+          "trailingComma": "es5",
+          "printWidth": 100,
+          "bracketSpacing": true,
+          "arrowParens": "avoid"
+        }
+      pattern:
+        description: Formatted code example
+        code: |
+          import { type FC } from 'react';
+
+          interface Props {
+            name: string;
+            onSubmit: (value: string) => void;
+          }
+
+          export const Component: FC<Props> = ({ name, onSubmit }) => {
+            return (
+              <button onClick={() => onSubmit(name)}>
+                {name}
+              </button>
+            );
+          };
+
+    - id: code-format-eslint
+      title: ESLint Configuration
+      file: .eslintrc.js
+      config: |
+        module.exports = {
+          extends: [
+            'next/core-web-vitals',
+            'plugin:@typescript-eslint/recommended',
+          ],
+          rules: {
+            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+            'no-console': ['warn', { allow: ['warn', 'error'] }],
+            'prefer-const': 'error',
+          },
+        }
+      keyRules[4]:
+        - rule: no-explicit-any
+          level: error
+          rationale: Prevents type safety loss
+        - rule: no-unused-vars
+          level: error
+          rationale: Clean code, allows _prefix for intentional ignores
+        - rule: no-console
+          level: warn
+          rationale: Use proper logging, allow warn/error
+        - rule: prefer-const
+          level: error
+          rationale: Immutability by default

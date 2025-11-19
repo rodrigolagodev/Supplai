@@ -1,0 +1,72 @@
+metadata:
+  id: ref-commands
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: Commands Cheatsheet
+  purpose: Quick reference for commonly used development commands.
+
+  sections[4]:
+    - id: ref-cmd-dev
+      title: Development
+      commands[6]:
+        - command: npm run dev
+          description: Start development server
+        - command: npm run build
+          description: Build for production
+        - command: npm run start
+          description: Start production server
+        - command: npm run lint
+          description: Run ESLint
+        - command: npm run format
+          description: Run Prettier
+        - command: npm run type-check
+          description: Run TypeScript compiler
+
+    - id: ref-cmd-test
+      title: Testing
+      commands[5]:
+        - command: npm run test
+          description: Run unit tests
+        - command: npm run test:watch
+          description: Run tests in watch mode
+        - command: npm run test:coverage
+          description: Run tests with coverage
+        - command: npm run test:e2e
+          description: Run E2E tests (Playwright)
+        - command: npx playwright test --ui
+          description: E2E tests with UI
+
+    - id: ref-cmd-supabase
+      title: Supabase
+      commands[7]:
+        - command: npx supabase start
+          description: Start local Supabase
+        - command: npx supabase stop
+          description: Stop local Supabase
+        - command: npx supabase db reset
+          description: Reset database
+        - command: npx supabase gen types typescript --local > src/types/database.ts
+          description: Generate TypeScript types
+        - command: npx supabase migration new [name]
+          description: Create new migration
+        - command: npx supabase db push
+          description: Apply migrations
+        - command: npx supabase functions deploy
+          description: Deploy Edge Functions
+
+    - id: ref-cmd-git
+      title: Git
+      commands[5]:
+        - command: git status
+          description: Check working tree status
+        - command: git diff
+          description: Show unstaged changes
+        - command: git add -p
+          description: Stage changes interactively
+        - command: git commit -m "type: message"
+          description: Commit with message
+        - command: git push -u origin branch
+          description: Push and set upstream

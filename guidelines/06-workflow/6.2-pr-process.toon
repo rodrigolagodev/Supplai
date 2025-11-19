@@ -1,0 +1,63 @@
+metadata:
+  id: flow-pr
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: flow-git
+
+content:
+  title: Pull Request Process
+  purpose: Define the PR creation, review, and merge workflow.
+
+  sections[2]:
+    - id: flow-pr-template
+      title: PR Template
+      template: |
+        ## Summary
+        Brief description of changes
+
+        ## Changes
+        - Change 1
+        - Change 2
+
+        ## Testing
+        - [ ] Unit tests pass
+        - [ ] Manual testing done
+        - [ ] E2E tests pass (if applicable)
+
+        ## Screenshots
+        (if UI changes)
+
+        ## Notes
+        Any additional context
+      pattern:
+        code: |
+          ## Summary
+          Add voice recording component for order input
+
+          ## Changes
+          - Implement VoiceRecorder component with MediaRecorder
+          - Add audio upload to Supabase Storage
+          - Create transcription API route
+
+          ## Testing
+          - [x] Unit tests for audio validation
+          - [x] Manual testing on Chrome/Safari
+          - [x] E2E test for recording flow
+
+          ## Screenshots
+          ![Voice button](screenshot.png)
+
+    - id: flow-pr-checklist
+      title: PR Checklist
+      beforeCreating[5]:
+        - Code follows project conventions
+        - No TypeScript errors
+        - Tests written and passing
+        - Self-reviewed changes
+        - PR title follows commit format
+      beforeMerging[5]:
+        - At least one approval
+        - All discussions resolved
+        - CI/CD passes
+        - No merge conflicts
+        - Squash commits if needed

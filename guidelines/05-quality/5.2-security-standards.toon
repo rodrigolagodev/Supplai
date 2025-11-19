@@ -1,0 +1,85 @@
+metadata:
+  id: qual-security
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: pat-supa-rls
+
+content:
+  title: Security Standards
+  purpose: Define security requirements and patterns for OWASP compliance.
+
+  sections[3]:
+    - id: qual-sec-validation
+      title: Input Validation
+      rule: Validate ALL user inputs with Zod
+      pattern:
+        code: |
+          import { z } from 'zod'
+
+          const OrderItemSchema = z.object({
+            product: z.string().min(1).max(200).trim(),
+            quantity: z.number().positive().max(10000),
+            unit: z.enum(['kg', 'g', 'units', 'dozen', 'liters']),
+          })
+
+          // In API route
+          const result = OrderItemSchema.safeParse(body)
+          if (!result.success) {
+            return Response.json({ error: 'Datos inválidos' }, { status: 400 })
+          }
+      antiPattern:
+        code: |
+          // DON'T trust user input
+          const { product, quantity } = body
+          await db.insert({ product, quantity }) // XSS/injection risk
+
+    - id: qual-sec-auth
+      title: Authentication
+      rule: Verify auth on every protected endpoint
+      pattern:
+        code: |
+          export async function POST(request: Request) {
+            const supabase = await createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+
+            if (!user) {
+              return Response.json({ error: 'No autorizado' }, { status: 401 })
+            }
+
+            // Proceed with authenticated user
+          }
+      antiPattern:
+        code: |
+          // DON'T skip auth check
+          export async function POST(request: Request) {
+            const body = await request.json()
+            await processOrder(body) // Who is calling this?
+          }
+
+    - id: qual-sec-checklist
+      title: Security Checklist
+      items[8]:
+        - id: qual-sec-check-rls
+          item: RLS enabled on all tables
+          critical: true
+        - id: qual-sec-check-auth
+          item: Auth verified on protected routes
+          critical: true
+        - id: qual-sec-check-validation
+          item: Input validation with Zod
+          critical: true
+        - id: qual-sec-check-secrets
+          item: No secrets in code
+          critical: true
+        - id: qual-sec-check-headers
+          item: Security headers configured
+          critical: false
+        - id: qual-sec-check-deps
+          item: No vulnerable dependencies
+          critical: true
+        - id: qual-sec-check-errors
+          item: Error messages don't leak info
+          critical: false
+        - id: qual-sec-check-logging
+          item: No sensitive data in logs
+          critical: true

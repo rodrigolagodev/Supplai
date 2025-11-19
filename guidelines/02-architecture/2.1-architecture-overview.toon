@@ -1,0 +1,136 @@
+metadata:
+  id: arch-overview
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: proj-overview,proj-stack
+
+content:
+  title: Architecture Overview
+  purpose: Define the high-level architecture, layers, and data flow of the Pedidos application.
+
+  sections[3]:
+    - id: arch-overview-layers
+      title: Application Layers
+      diagram: |
+        ┌─────────────────────────────────────────────────┐
+        │              PRESENTATION LAYER                 │
+        │  Next.js App Router (Server + Client Components)│
+        └─────────────────────┬───────────────────────────┘
+                              │
+        ┌─────────────────────▼───────────────────────────┐
+        │              APPLICATION LAYER                  │
+        │  API Routes, Server Actions, Edge Functions     │
+        └─────────────────────┬───────────────────────────┘
+                              │
+        ┌─────────────────────▼───────────────────────────┐
+        │              INTEGRATION LAYER                  │
+        │  Supabase Client, Groq SDK, Gemini SDK, Resend  │
+        └─────────────────────┬───────────────────────────┘
+                              │
+        ┌─────────────────────▼───────────────────────────┐
+        │              DATA LAYER                         │
+        │  PostgreSQL (Supabase), Storage, Auth           │
+        └─────────────────────────────────────────────────┘
+
+      layers[4]:
+        - id: arch-overview-layer-presentation
+          name: Presentation
+          technologies[3]: Next.js App Router,React Server Components,Tailwind CSS
+          responsibility: UI rendering and user interaction
+        - id: arch-overview-layer-application
+          name: Application
+          technologies[3]: API Routes,Server Actions,Edge Functions
+          responsibility: Business logic and orchestration
+        - id: arch-overview-layer-integration
+          name: Integration
+          technologies[4]: Supabase Client,Groq SDK,Gemini SDK,Resend
+          responsibility: External service communication
+        - id: arch-overview-layer-data
+          name: Data
+          technologies[3]: PostgreSQL,Supabase Storage,Supabase Auth
+          responsibility: Data persistence and security
+
+    - id: arch-overview-data-flow
+      title: Core Data Flow
+      description: Order creation from voice input to delivery
+      flow:
+        diagram: |
+          User Voice ──► Groq Whisper ──► Raw Text
+                                              │
+                                              ▼
+          Suppliers ◄── Classification ◄── Gemini Parse
+              │                               │
+              ▼                               ▼
+          Formatted    Human Review ◄── Parsed Items
+          Messages          │
+              │             ▼
+              ▼         Approved
+          Resend ─────► Email Sent ──► Suppliers
+
+        steps[6]:
+          - id: arch-overview-flow-input
+            step: 1
+            name: Voice/Text Input
+            action: User records audio or types text
+            component: VoiceRecorder / TextInput
+            output: Audio blob or text string
+          - id: arch-overview-flow-transcription
+            step: 2
+            name: Transcription
+            action: Convert speech to text
+            component: Groq Whisper API
+            output: Transcribed Spanish text
+          - id: arch-overview-flow-parsing
+            step: 3
+            name: AI Parsing
+            action: Extract structured items
+            component: Gemini 1.5 Flash
+            output: "Array of {product, quantity, unit, category}"
+          - id: arch-overview-flow-classification
+            step: 4
+            name: Classification
+            action: Match items to user suppliers
+            component: Classification algorithm
+            output: Items with supplier_id assigned
+          - id: arch-overview-flow-review
+            step: 5
+            name: Human Review
+            action: User reviews and edits
+            component: OrderReview page
+            output: Approved order
+          - id: arch-overview-flow-delivery
+            step: 6
+            name: Delivery
+            action: Send to suppliers
+            component: Resend API
+            output: Emails sent
+
+    - id: arch-overview-deployment
+      title: Deployment Architecture
+      diagram: |
+        ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+        │   Browser    │ ──► │   Vercel     │ ──► │  Supabase    │
+        │   Client     │     │   Edge       │     │  Cloud       │
+        └──────────────┘     └──────┬───────┘     └──────────────┘
+                                    │
+                              ┌─────▼─────┐
+                              │ External  │
+                              │ APIs      │
+                              │ Groq      │
+                              │ Gemini    │
+                              │ Resend    │
+                              └───────────┘
+
+      components[4]:
+        - name: Vercel
+          role: Hosting
+          features[3]: Edge Functions,CDN,Preview Deploys
+        - name: Supabase
+          role: Backend
+          features[4]: Database,Auth,Storage,Realtime
+        - name: Groq
+          role: STT
+          features[2]: Whisper API,Fast Inference
+        - name: Resend
+          role: Email
+          features[2]: Email API,Delivery Analytics

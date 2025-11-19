@@ -1,0 +1,211 @@
+metadata:
+  id: code-naming
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-entities
+
+content:
+  title: Naming Conventions
+  purpose: Define consistent naming rules for all code elements in Pedidos.
+
+  sections[5]:
+    - id: code-naming-files
+      title: Files and Directories
+      items[7]:
+        - id: code-naming-files-components
+          element: React Components
+          convention: PascalCase
+          extension: .tsx
+          examples[3]: OrderItem.tsx,VoiceRecorder.tsx,SupplierCard.tsx
+          pattern:
+            code: |
+              components/
+                orders/
+                  OrderItem.tsx
+                  OrderList.tsx
+                  OrderForm.tsx
+          antiPattern:
+            code: |
+              components/
+                orders/
+                  orderItem.tsx      // Wrong: camelCase
+                  order-list.tsx     // Wrong: kebab-case
+                  ORDERFORM.tsx      // Wrong: UPPERCASE
+
+        - id: code-naming-files-hooks
+          element: Custom Hooks
+          convention: camelCase with use prefix
+          extension: .ts
+          examples[3]: useOrders.ts,useSuppliers.ts,useAudioRecorder.ts
+
+        - id: code-naming-files-utils
+          element: Utility Functions
+          convention: camelCase
+          extension: .ts
+          examples[3]: formatQuantity.ts,validateEmail.ts,parseOrder.ts
+
+        - id: code-naming-files-types
+          element: Type Definitions
+          convention: camelCase or feature.types.ts
+          extension: .ts
+          examples[3]: order.ts,supplier.types.ts,database.ts
+
+        - id: code-naming-files-routes
+          element: App Router Routes
+          convention: kebab-case directories
+          examples[3]: orders/[id]/edit/page.tsx,order-history/page.tsx,new-supplier/page.tsx
+
+        - id: code-naming-files-api
+          element: API Routes
+          convention: kebab-case in path
+          examples[3]: api/process-order/route.ts,api/send-email/route.ts
+
+        - id: code-naming-files-tests
+          element: Test Files
+          convention: same as source + .test
+          examples[3]: OrderItem.test.tsx,formatQuantity.test.ts,useOrders.test.ts
+
+    - id: code-naming-code
+      title: Code Elements
+      items[6]:
+        - id: code-naming-code-variables
+          element: Variables
+          convention: camelCase
+          examples[3]: orderItems,isLoading,userEmail
+          pattern:
+            code: |
+              const orderItems = []
+              const isLoading = true
+              let currentUser = null
+          antiPattern:
+            code: |
+              const OrderItems = []    // Wrong: PascalCase
+              const order_items = []   // Wrong: snake_case
+              const ITEMS = []         // Wrong: for non-constants
+
+        - id: code-naming-code-constants
+          element: Constants
+          convention: SCREAMING_SNAKE_CASE
+          examples[3]: MAX_ITEMS_PER_ORDER,API_TIMEOUT_MS,DEFAULT_UNIT
+          pattern:
+            code: |
+              const MAX_FILE_SIZE = 10 * 1024 * 1024
+              const SUPPORTED_AUDIO_TYPES = ['audio/webm', 'audio/mp4']
+              const DEFAULT_CONFIDENCE_THRESHOLD = 0.8
+
+        - id: code-naming-code-functions
+          element: Functions
+          convention: camelCase, verb prefix
+          examples[3]: getOrders,createSupplier,validateInput
+          pattern:
+            code: |
+              function calculateTotal(items) { }
+              async function fetchOrders() { }
+              const handleSubmit = () => { }
+
+        - id: code-naming-code-types
+          element: Types/Interfaces
+          convention: PascalCase, descriptive suffix
+          examples[3]: OrderItem,SupplierCategory,CreateOrderInput
+          pattern:
+            code: |
+              interface OrderItemProps { }
+              type SupplierCategory = 'meats' | 'dairy'
+              type CreateOrderResponse = { }
+
+        - id: code-naming-code-enums
+          element: Enums
+          convention: PascalCase name, SCREAMING_SNAKE values
+          pattern:
+            code: |
+              enum OrderStatus {
+                DRAFT = 'draft',
+                REVIEW = 'review',
+                SENT = 'sent',
+              }
+
+        - id: code-naming-code-booleans
+          element: Booleans
+          convention: is/has/should prefix
+          examples[3]: isLoading,hasError,shouldRefetch
+          pattern:
+            code: |
+              const isVisible = true
+              const hasPermission = user.role === 'admin'
+              const shouldShowWarning = confidence < 0.8
+
+    - id: code-naming-database
+      title: Database Elements
+      items[4]:
+        - id: code-naming-db-tables
+          element: Tables
+          convention: snake_case, plural
+          examples[3]: orders,order_items,suppliers
+
+        - id: code-naming-db-columns
+          element: Columns
+          convention: snake_case
+          examples[3]: created_at,user_id,supplier_id
+
+        - id: code-naming-db-indexes
+          element: Indexes
+          convention: idx_table_column(s)
+          examples[3]: idx_orders_user_id,idx_items_order_id
+
+        - id: code-naming-db-functions
+          element: Functions
+          convention: snake_case, verb prefix
+          examples[3]: get_user_orders,calculate_total
+
+    - id: code-naming-env
+      title: Environment Variables
+      items[3]:
+        - id: code-naming-env-public
+          element: Public (client-safe)
+          convention: NEXT_PUBLIC_ prefix
+          examples[2]: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_APP_URL
+
+        - id: code-naming-env-secret
+          element: Secret (server-only)
+          convention: SERVICE_NAME prefix
+          examples[3]: SUPABASE_SERVICE_ROLE_KEY,GROQ_API_KEY,RESEND_API_KEY
+
+        - id: code-naming-env-flags
+          element: Feature Flags
+          convention: FF_ prefix
+          examples[2]: FF_ENABLE_WHATSAPP,FF_DEBUG_MODE
+
+    - id: code-naming-semantic
+      title: Semantic Naming
+      rules[4]:
+        - id: code-naming-semantic-descriptive
+          rule: Names should be descriptive and self-documenting
+          pattern:
+            code: |
+              const unclassifiedItems = items.filter(i => !i.supplierId)
+          antiPattern:
+            code: |
+              const x = items.filter(i => !i.supplierId) // What is x?
+
+        - id: code-naming-semantic-consistent
+          rule: Use consistent terminology throughout codebase
+          pattern:
+            code: |
+              // Always use 'supplier', never 'vendor' or 'provider'
+              const suppliers = await getSuppliers()
+              const supplierId = item.supplier_id
+
+        - id: code-naming-semantic-plural
+          rule: Use plural for collections, singular for items
+          pattern:
+            code: |
+              const orders = await getOrders()
+              for (const order of orders) { }
+
+        - id: code-naming-semantic-handlers
+          rule: Event handlers use handle prefix
+          pattern:
+            code: |
+              const handleSubmit = () => { }
+              const handleDelete = (id) => { }
+              onClick={handleClick}

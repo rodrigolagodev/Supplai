@@ -1,0 +1,94 @@
+metadata:
+  id: pat-ai
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: arch-adr-004,arch-adr-005
+
+content:
+  title: AI Integration Patterns
+  purpose: Define patterns for integrating AI services (Groq, Gemini) reliably.
+
+  sections[3]:
+    - id: pat-ai-prompts
+      title: Prompt Engineering
+      rules[4]:
+        - Request JSON output explicitly
+        - Use low temperature (0.0-0.2) for parsing
+        - Include examples in prompt
+        - Request confidence scores
+      pattern:
+        code: |
+          const prompt = `Eres un asistente de pedidos de restaurante.
+
+          Extrae los items del texto: "${text}"
+
+          Responde SOLO con JSON válido:
+          {
+            "items": [{
+              "product": "nombre",
+              "quantity": número,
+              "unit": "kg|units|dozen|...",
+              "confidence": 0.0-1.0
+            }]
+          }
+
+          Ejemplos:
+          "2 kilos de tomate" → {"product":"tomate","quantity":2,"unit":"kg","confidence":0.95}
+          "media docena de huevos" → {"product":"huevos","quantity":6,"unit":"units","confidence":0.9}`
+      antiPattern:
+        code: |
+          // DON'T use high temperature for parsing
+          const config = { temperature: 0.9 }
+
+          // DON'T forget to request JSON
+          const prompt = `Extract items from...` // May return prose
+
+    - id: pat-ai-retry
+      title: Retry with Backoff
+      pattern:
+        code: |
+          async function withRetry<T>(
+            fn: () => Promise<T>,
+            maxRetries = 3
+          ): Promise<T> {
+            for (let i = 0; i < maxRetries; i++) {
+              try {
+                return await fn()
+              } catch (error) {
+                if (i === maxRetries - 1) throw error
+                await sleep(1000 * Math.pow(2, i)) // Exponential backoff
+              }
+            }
+            throw new Error('Max retries exceeded')
+          }
+
+          // Usage
+          const result = await withRetry(() => gemini.generateContent(prompt))
+
+    - id: pat-ai-confidence
+      title: Confidence Handling
+      pattern:
+        code: |
+          const CONFIDENCE_THRESHOLD = 0.8
+
+          interface ParsedItem {
+            product: string
+            quantity: number
+            confidence: number
+          }
+
+          function processItems(items: ParsedItem[]) {
+            const confident = items.filter(i => i.confidence >= CONFIDENCE_THRESHOLD)
+            const needsReview = items.filter(i => i.confidence < CONFIDENCE_THRESHOLD)
+
+            return {
+              items: confident,
+              reviewRequired: needsReview,
+              hasLowConfidence: needsReview.length > 0,
+            }
+          }
+      antiPattern:
+        code: |
+          // DON'T ignore confidence scores
+          const items = parsed.items
+          await saveAllItems(items) // Some may be wrong!

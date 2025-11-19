@@ -1,0 +1,194 @@
+metadata:
+  id: proj-entities
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-overview
+
+content:
+  title: Domain Entities
+  purpose: Define the core data entities, their fields, relationships, and validation rules.
+
+  sections[4]:
+    - id: proj-entities-supplier
+      title: Supplier
+      description: A vendor that receives orders for specific product categories
+      fields[7]:
+        - name: id
+          type: UUID
+          required: true
+          generated: true
+          description: Primary key
+        - name: user_id
+          type: UUID
+          required: true
+          reference: auth.users.id
+          description: Owner of this supplier
+        - name: name
+          type: string
+          required: true
+          maxLength: 200
+          description: Supplier business name
+        - name: email
+          type: string
+          required: false
+          format: email
+          description: Email for order delivery
+        - name: phone
+          type: string
+          required: false
+          format: phone
+          description: Phone/WhatsApp number
+        - name: category
+          type: enum
+          required: true
+          values[6]: fruits_vegetables,meats,fish_seafood,dry_goods,dairy,beverages
+          description: Product category this supplier provides
+        - name: custom_keywords
+          type: string[]
+          required: false
+          default: []
+          description: Custom words to match products to this supplier
+      businessRules[3]:
+        - rule: User can have multiple suppliers per category
+        - rule: At least email or phone required for delivery
+        - rule: Keywords are case-insensitive for matching
+
+    - id: proj-entities-order
+      title: Order
+      description: A collection of items to be sent to suppliers
+      fields[6]:
+        - name: id
+          type: UUID
+          required: true
+          generated: true
+          description: Primary key
+        - name: user_id
+          type: UUID
+          required: true
+          reference: auth.users.id
+          description: User who created the order
+        - name: status
+          type: enum
+          required: true
+          default: draft
+          values[4]: draft,review,sent,archived
+          description: Current order status
+        - name: sent_at
+          type: timestamp
+          required: false
+          description: When order was sent to suppliers
+        - name: created_at
+          type: timestamp
+          required: true
+          generated: true
+          description: Creation timestamp
+        - name: updated_at
+          type: timestamp
+          required: true
+          generated: true
+          description: Last update timestamp
+      statuses:
+        - id: proj-entities-order-status-draft
+          name: draft
+          description: Being created or edited
+          allowedTransitions[1]: review
+        - id: proj-entities-order-status-review
+          name: review
+          description: Ready for human review
+          allowedTransitions[2]: draft,sent
+        - id: proj-entities-order-status-sent
+          name: sent
+          description: Delivered to suppliers
+          allowedTransitions[1]: archived
+        - id: proj-entities-order-status-archived
+          name: archived
+          description: Completed and archived
+          allowedTransitions[0]:
+
+    - id: proj-entities-order-item
+      title: OrderItem
+      description: A single product line within an order
+      fields[8]:
+        - name: id
+          type: UUID
+          required: true
+          generated: true
+          description: Primary key
+        - name: order_id
+          type: UUID
+          required: true
+          reference: orders.id
+          onDelete: CASCADE
+          description: Parent order
+        - name: supplier_id
+          type: UUID
+          required: false
+          reference: suppliers.id
+          onDelete: SET NULL
+          description: "Assigned supplier (null = unclassified)"
+        - name: product
+          type: string
+          required: true
+          maxLength: 200
+          description: Product name (normalized)
+        - name: quantity
+          type: decimal
+          required: true
+          min: 0.01
+          max: 10000
+          precision: 2
+          description: Amount to order
+        - name: unit
+          type: enum
+          required: true
+          values[8]: kg,g,units,dozen,liters,ml,packages,boxes
+          description: Unit of measurement
+        - name: original_text
+          type: string
+          required: false
+          description: Original transcribed text for this item
+        - name: confidence_score
+          type: decimal
+          required: false
+          min: 0
+          max: 1
+          description: AI confidence in parsing (0.0-1.0)
+      businessRules[3]:
+        - rule: Items without supplier_id shown as unclassified
+        - rule: Low confidence (<0.8) items highlighted for review
+        - rule: Quantity normalized to decimals (half dozen = 6)
+
+    - id: proj-entities-relationships
+      title: Entity Relationships
+      diagram: |
+        User (auth.users)
+          │
+          ├── 1:N ── Supplier
+          │            │
+          └── 1:N ── Order
+                       │
+                       └── 1:N ── OrderItem ── N:1 ── Supplier
+
+      pattern:
+        description: Query order with items and suppliers
+        code: |
+          const { data } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              order_items (
+                *,
+                supplier:suppliers (id, name, email)
+              )
+            `)
+            .eq('id', orderId)
+            .single()
+      antiPattern:
+        description: Multiple queries for related data
+        code: |
+          // Inefficient N+1 queries
+          const order = await getOrder(id)
+          const items = await getOrderItems(id)
+          for (const item of items) {
+            item.supplier = await getSupplier(item.supplier_id)
+          }

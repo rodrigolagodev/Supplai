@@ -1,0 +1,79 @@
+metadata:
+  id: arch-adr-001
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-stack
+
+content:
+  title: "ADR-001: App Router over Pages Router"
+  purpose: Document the decision to use Next.js App Router exclusively.
+
+  sections[1]:
+    - id: arch-adr-001-decision
+      title: Decision Record
+      status: Accepted
+      date: 2025-11-18
+
+      context: |
+        Next.js offers two routing systems: the legacy Pages Router and the newer App Router.
+        We need to choose one approach for the entire application.
+
+      decision: Use Next.js App Router exclusively for all routing and data fetching.
+
+      rationale[5]:
+        - Server Components by default reduce client bundle size
+        - Simplified data fetching with async components
+        - Better streaming and loading states support
+        - Co-located layouts and error boundaries
+        - Future-proof as Pages Router is in maintenance mode
+
+      consequences:
+        positive[4]:
+          - Smaller JavaScript bundle sent to client
+          - Simpler mental model for data fetching
+          - Built-in loading and error UI
+          - Nested layouts without prop drilling
+        negative[3]:
+          - Learning curve for team used to Pages Router
+          - Some libraries may lack App Router support
+          - More complex caching behavior
+
+      alternatives[2]:
+        - id: arch-adr-001-alt-pages
+          name: Pages Router
+          rejected: true
+          reason: Legacy approach, larger bundles, more complex data fetching
+        - id: arch-adr-001-alt-hybrid
+          name: Hybrid approach
+          rejected: true
+          reason: Increases complexity, inconsistent patterns
+
+      pattern:
+        description: App Router page structure
+        code: |
+          // app/orders/page.tsx
+          export default async function OrdersPage() {
+            const orders = await getOrders() // Server-side fetch
+            return <OrderList orders={orders} />
+          }
+
+          // app/orders/loading.tsx
+          export default function Loading() {
+            return <OrderListSkeleton />
+          }
+
+          // app/orders/error.tsx
+          'use client'
+          export default function Error({ error, reset }) {
+            return <ErrorMessage error={error} onRetry={reset} />
+          }
+      antiPattern:
+        description: Pages Router patterns in App Router
+        code: |
+          // DON'T use getServerSideProps
+          export async function getServerSideProps() {
+            return { props: { orders } }
+          }
+
+          // DON'T use _app.tsx or _document.tsx
+          // Use app/layout.tsx instead

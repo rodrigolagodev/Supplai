@@ -1,0 +1,111 @@
+metadata:
+  id: arch-adr-006
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: proj-stack,proj-principles-reliability
+
+content:
+  title: "ADR-006: Email-First Delivery for MVP"
+  purpose: Document the decision to use email as the primary delivery channel for MVP.
+
+  sections[1]:
+    - id: arch-adr-006-decision
+      title: Decision Record
+      status: Accepted
+      date: 2025-11-18
+
+      context: |
+        Orders need to be delivered to suppliers. Options include email, WhatsApp, SMS, or custom portal.
+        MVP needs quick implementation with reliable delivery.
+        WhatsApp is popular but requires business verification and API costs.
+
+      decision: Use email via Resend as the primary (and only) delivery channel for MVP.
+
+      rationale[5]:
+        - Simplest implementation (no business verification)
+        - Universal - all suppliers have email
+        - Reliable delivery with good tracking
+        - Resend has generous free tier (100 emails/day)
+        - Professional appearance with HTML templates
+
+      consequences:
+        positive[4]:
+          - Fast MVP development
+          - No API costs for initial users
+          - Easy to track delivery status
+          - Can include formatted order details
+        negative[3]:
+          - Some users prefer WhatsApp
+          - Email may be checked less frequently
+          - Spam folder risk
+
+      postMVP:
+        - WhatsApp Business API via Twilio
+        - SMS as fallback
+        - User preference per supplier
+
+      alternatives[3]:
+        - id: arch-adr-006-alt-whatsapp
+          name: WhatsApp first
+          rejected: true
+          reason: "Requires business verification (weeks), API costs, complex setup"
+        - id: arch-adr-006-alt-sms
+          name: SMS
+          rejected: true
+          reason: "Character limits, higher cost, poor formatting"
+        - id: arch-adr-006-alt-both
+          name: Email + WhatsApp from start
+          rejected: true
+          reason: "Doubles implementation time, delays MVP"
+
+      emailProvider:
+        name: Resend
+        rationale[4]:
+          - Simple REST API
+          - Good deliverability
+          - React Email for templates
+          - 100 emails/day free
+
+      pattern:
+        description: Email sending with Resend
+        code: |
+          import { Resend } from 'resend'
+          import { OrderEmail } from '@/emails/OrderEmail'
+
+          const resend = new Resend(process.env.RESEND_API_KEY)
+
+          async function sendOrderToSupplier(
+            supplier: Supplier,
+            items: OrderItem[]
+          ): Promise<SendResult> {
+            const { data, error } = await resend.emails.send({
+              from: 'Pedidos <pedidos@tudominio.com>',
+              to: supplier.email,
+              subject: `Nuevo pedido de ${userName}`,
+              react: OrderEmail({ supplier, items, date: new Date() }),
+            })
+
+            if (error) {
+              throw new DeliveryError(`Failed to send to ${supplier.name}`, error)
+            }
+
+            return {
+              messageId: data.id,
+              supplier: supplier.id,
+              sentAt: new Date(),
+            }
+          }
+      antiPattern:
+        description: Poor email practices
+        code: |
+          // DON'T send without proper from address
+          from: 'noreply@localhost' // Will be marked spam
+
+          // DON'T ignore send errors
+          await resend.emails.send(options) // Check result!
+
+          // DON'T send plain text only
+          text: 'Pedido: 2kg tomates' // Hard to read
+
+          // DON'T send all items in one email to all suppliers
+          // Each supplier should only see their items

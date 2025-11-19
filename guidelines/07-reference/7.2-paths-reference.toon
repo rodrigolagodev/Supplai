@@ -1,0 +1,64 @@
+metadata:
+  id: ref-paths
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: code-organization
+
+content:
+  title: Paths Reference
+  purpose: Quick reference for important file and directory paths.
+
+  sections[3]:
+    - id: ref-paths-src
+      title: Source Code
+      paths[10]:
+        - path: src/app/
+          description: Next.js App Router pages
+        - path: src/app/api/
+          description: API routes
+        - path: src/components/
+          description: React components
+        - path: src/components/ui/
+          description: Base UI components
+        - path: src/lib/supabase/
+          description: Supabase clients
+        - path: src/lib/ai/
+          description: AI service integrations
+        - path: src/lib/utils/
+          description: Utility functions
+        - path: src/hooks/
+          description: Custom React hooks
+        - path: src/types/
+          description: TypeScript types
+        - path: src/types/database.ts
+          description: Generated Supabase types
+
+    - id: ref-paths-config
+      title: Configuration
+      paths[8]:
+        - path: .claude/agents/
+          description: Subagent configurations
+        - path: guidelines/
+          description: Development guidelines
+        - path: supabase/migrations/
+          description: Database migrations
+        - path: supabase/functions/
+          description: Edge Functions
+        - path: .env.local
+          description: Environment variables
+        - path: next.config.js
+          description: Next.js configuration
+        - path: tailwind.config.ts
+          description: Tailwind configuration
+        - path: tsconfig.json
+          description: TypeScript configuration
+
+    - id: ref-paths-testing
+      title: Testing
+      paths[3]:
+        - path: __tests__/
+          description: Test utilities and mocks
+        - path: e2e/
+          description: E2E tests (Playwright)
+        - path: "*.test.tsx"
+          description: Co-located unit tests

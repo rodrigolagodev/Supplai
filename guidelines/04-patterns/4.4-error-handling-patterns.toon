@@ -1,0 +1,104 @@
+metadata:
+  id: pat-errors
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: proj-principles-reliability
+
+content:
+  title: Error Handling Patterns
+  purpose: Define consistent error handling for reliability and user experience.
+
+  sections[3]:
+    - id: pat-errors-user
+      title: User-Facing Errors
+      rules[3]:
+        - Always in Spanish
+        - Explain what happened and what to do
+        - Never expose internal details
+      pattern:
+        code: |
+          const ERROR_MESSAGES = {
+            AUTH_REQUIRED: 'Debes iniciar sesión para continuar',
+            ORDER_NOT_FOUND: 'No se encontró el pedido',
+            TRANSCRIPTION_FAILED: 'No se pudo transcribir. Intenta de nuevo o escribe el pedido.',
+            NETWORK_ERROR: 'Error de conexión. Verifica tu internet.',
+            UNKNOWN: 'Ocurrió un error. Por favor, intenta de nuevo.',
+          }
+
+          function getUserMessage(error: Error): string {
+            if (error.message.includes('auth')) return ERROR_MESSAGES.AUTH_REQUIRED
+            if (error.message.includes('network')) return ERROR_MESSAGES.NETWORK_ERROR
+            return ERROR_MESSAGES.UNKNOWN
+          }
+      antiPattern:
+        code: |
+          // DON'T expose internal errors
+          return Response.json({ error: error.stack })
+
+          // DON'T use technical jargon
+          return { error: 'ECONNREFUSED 127.0.0.1:5432' }
+
+    - id: pat-errors-api
+      title: API Error Responses
+      pattern:
+        code: |
+          export async function POST(request: Request) {
+            try {
+              const supabase = await createClient()
+              const { data: { user } } = await supabase.auth.getUser()
+
+              if (!user) {
+                return Response.json(
+                  { error: 'No autorizado' },
+                  { status: 401 }
+                )
+              }
+
+              const body = await request.json()
+              const result = Schema.safeParse(body)
+
+              if (!result.success) {
+                return Response.json(
+                  { error: 'Datos inválidos', details: result.error.format() },
+                  { status: 400 }
+                )
+              }
+
+              // Process...
+              return Response.json({ data }, { status: 200 })
+
+            } catch (error) {
+              console.error('API Error:', error)
+              return Response.json(
+                { error: 'Error interno del servidor' },
+                { status: 500 }
+              )
+            }
+          }
+
+    - id: pat-errors-logging
+      title: Error Logging
+      pattern:
+        code: |
+          function logError(error: Error, context: Record<string, unknown>) {
+            // Sanitize sensitive data
+            const safe = {
+              ...context,
+              password: undefined,
+              token: undefined,
+            }
+
+            console.error({
+              message: error.message,
+              stack: error.stack,
+              context: safe,
+              timestamp: new Date().toISOString(),
+            })
+          }
+      antiPattern:
+        code: |
+          // DON'T log sensitive data
+          console.error('Login failed', { email, password })
+
+          // DON'T swallow errors silently
+          try { await process() } catch { /* nothing */ }

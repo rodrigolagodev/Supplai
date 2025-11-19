@@ -1,0 +1,63 @@
+metadata:
+  id: flow-dod
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[4]: qual-testing,qual-security,flow-pr,code-typescript
+
+content:
+  title: Definition of Done
+  purpose: Define criteria for considering a task complete.
+
+  sections[1]:
+    - id: flow-dod-checklist
+      title: Completion Checklist
+      categories[6]:
+        - id: flow-dod-code
+          name: Code Quality
+          items[5]:
+            - Code follows naming conventions
+            - No TypeScript errors
+            - No ESLint warnings
+            - Formatted with Prettier
+            - No dead or commented code
+
+        - id: flow-dod-testing
+          name: Testing
+          items[4]:
+            - Unit tests written and passing
+            - Integration tests (if API)
+            - Manual testing completed
+            - Coverage thresholds met
+
+        - id: flow-dod-security
+          name: Security
+          items[4]:
+            - Input validation implemented
+            - Auth checks in place
+            - RLS policies verified
+            - No exposed secrets
+
+        - id: flow-dod-docs
+          name: Documentation
+          items[3]:
+            - Code is self-documenting
+            - Complex logic has comments
+            - Types are complete
+
+        - id: flow-dod-review
+          name: Review
+          items[3]:
+            - Code reviewed
+            - Security reviewed (if sensitive)
+            - PR approved
+
+        - id: flow-dod-deploy
+          name: Deployment
+          items[3]:
+            - Works in development
+            - Preview deployment tested
+            - No console errors
+
+      summary: |
+        A task is NOT done until all applicable items are checked.
+        Skip items only with explicit justification.

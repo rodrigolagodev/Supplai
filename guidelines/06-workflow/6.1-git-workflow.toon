@@ -1,0 +1,83 @@
+metadata:
+  id: flow-git
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: Git Workflow
+  purpose: Define Git branching strategy, commit conventions, and collaboration patterns.
+
+  sections[3]:
+    - id: flow-git-branches
+      title: Branch Naming
+      format: "type/description"
+      types[6]:
+        - type: feature
+          example: feature/add-voice-recording
+          description: New functionality
+        - type: bugfix
+          example: bugfix/fix-order-parsing
+          description: Bug fixes
+        - type: hotfix
+          example: hotfix/security-patch
+          description: Urgent production fixes
+        - type: chore
+          example: chore/update-dependencies
+          description: Maintenance tasks
+        - type: docs
+          example: docs/add-api-docs
+          description: Documentation
+        - type: refactor
+          example: refactor/simplify-auth
+          description: Code restructuring
+
+    - id: flow-git-commits
+      title: Commit Messages
+      format: "type: short description"
+      types[7]:
+        - type: feat
+          description: New feature
+        - type: fix
+          description: Bug fix
+        - type: docs
+          description: Documentation
+        - type: style
+          description: Formatting
+        - type: refactor
+          description: Code restructure
+        - type: test
+          description: Adding tests
+        - type: chore
+          description: Maintenance
+      pattern:
+        code: |
+          feat: add voice recording component
+
+          - Implement MediaRecorder integration
+          - Add audio file validation
+          - Create upload to Supabase Storage
+
+          Refs: #123
+      antiPattern:
+        code: |
+          # Bad examples
+          "fix bug"           # Not descriptive
+          "WIP"               # Don't commit WIP
+          "asdfasdf"          # Meaningless
+          "feat: Add Feature" # Don't capitalize after colon
+
+    - id: flow-git-rules
+      title: Git Rules
+      do[5]:
+        - Write descriptive commit messages
+        - Keep commits focused and atomic
+        - Pull before push
+        - Use feature branches
+        - Delete merged branches
+      dont[5]:
+        - Commit directly to main
+        - Force push to shared branches
+        - Commit secrets or .env files
+        - Use git add . without review
+        - Amend commits already pushed

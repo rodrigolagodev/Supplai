@@ -1,0 +1,68 @@
+metadata:
+  id: proj-overview
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[0]:
+
+content:
+  title: Project Overview
+  purpose: Define the mission, target users, problem statement, and solution approach for Pedidos.
+
+  sections[4]:
+    - id: proj-overview-mission
+      title: Mission Statement
+      description: "Automate order management and delivery to suppliers in restaurants via voice/text input and AI classification, with zero learning curve for end users."
+
+    - id: proj-overview-users
+      title: Target Users
+      items[2]:
+        - id: proj-overview-users-primary
+          type: Primary
+          description: Kitchen chefs
+          context: "End of service, tired, cold storage rooms, hands occupied"
+        - id: proj-overview-users-secondary
+          type: Secondary
+          description: Purchase managers
+          context: "Office environment, multiple supplier relationships"
+      language: Spanish (Latin America)
+      region: LATAM
+
+    - id: proj-overview-problem
+      title: Problem Statement
+      core: "Chef must manually transcribe handwritten notes to individual WhatsApp/email messages for each supplier at end of tiring service day."
+      painPoints[4]:
+        - id: proj-overview-problem-inefficiency
+          issue: Manual transcription inefficiency
+          impact: Time wasted after long shifts
+        - id: proj-overview-problem-fragmented
+          issue: Multiple fragmented conversations
+          impact: No unified view of orders
+        - id: proj-overview-problem-history
+          issue: No centralized history
+          impact: Cannot track or audit past orders
+        - id: proj-overview-problem-conditions
+          issue: Adverse working conditions
+          impact: "Cold rooms, wet hands, noise"
+
+    - id: proj-overview-solution
+      title: Solution Approach
+      flow[6]:
+        - step: 1
+          name: Input
+          description: Voice or text order entry
+        - step: 2
+          name: Transcription
+          description: Groq Whisper converts speech to text
+        - step: 3
+          name: Parsing
+          description: Gemini extracts structured items
+        - step: 4
+          name: Classification
+          description: AI matches items to suppliers
+        - step: 5
+          name: Review
+          description: Human approves/edits before sending
+        - step: 6
+          name: Delivery
+          description: Send via email (MVP) or WhatsApp (post-MVP)
+      keyDifferentiator: "Voice-first with mandatory human review - AI assists but never sends without approval"

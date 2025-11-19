@@ -1,0 +1,146 @@
+metadata:
+  id: pat-react
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[2]: arch-adr-001,arch-adr-003
+
+content:
+  title: React and Next.js Patterns
+  purpose: Define React and Next.js patterns for consistent component development.
+
+  sections[4]:
+    - id: pat-react-server-client
+      title: Server vs Client Components
+      items[2]:
+        - id: pat-react-server
+          name: Server Components (Default)
+          when[4]: Data fetching,Static content,No user interaction,SEO-critical pages
+          pattern:
+            code: |
+              // app/orders/page.tsx - Server Component
+              import { createClient } from '@/lib/supabase/server'
+
+              export default async function OrdersPage() {
+                const supabase = await createClient()
+                const { data: orders } = await supabase.from('orders').select('*')
+                return <OrderList orders={orders ?? []} />
+              }
+
+        - id: pat-react-client
+          name: Client Components
+          when[4]: Event handlers,Hooks (useState/useEffect),Browser APIs,Real-time updates
+          pattern:
+            code: |
+              'use client'
+
+              import { useState } from 'react'
+
+              export function VoiceRecorder() {
+                const [isRecording, setIsRecording] = useState(false)
+
+                return (
+                  <button onClick={() => setIsRecording(!isRecording)}>
+                    {isRecording ? 'Detener' : 'Grabar'}
+                  </button>
+                )
+              }
+          antiPattern:
+            code: |
+              'use client' // Unnecessary!
+
+              export default function OrdersPage() {
+                const [orders, setOrders] = useState([])
+                useEffect(() => { fetch(...) }, [])
+                // Should be Server Component with direct fetch
+              }
+
+    - id: pat-react-actions
+      title: Server Actions
+      pattern:
+        code: |
+          // app/orders/actions.ts
+          'use server'
+
+          import { revalidatePath } from 'next/cache'
+          import { createClient } from '@/lib/supabase/server'
+
+          export async function createOrder(formData: FormData) {
+            const supabase = await createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+
+            if (!user) throw new Error('No autorizado')
+
+            const { error } = await supabase
+              .from('orders')
+              .insert({ user_id: user.id, status: 'draft' })
+
+            if (error) throw new Error('Error al crear pedido')
+
+            revalidatePath('/orders')
+          }
+
+          // Usage in component
+          <form action={createOrder}>
+            <button type="submit">Crear Pedido</button>
+          </form>
+
+    - id: pat-react-hooks
+      title: Custom Hooks Pattern
+      pattern:
+        code: |
+          // hooks/useOrders.ts
+          'use client'
+
+          export function useOrders(options: { status?: string } = {}) {
+            const [orders, setOrders] = useState<Order[]>([])
+            const [isLoading, setIsLoading] = useState(true)
+            const [error, setError] = useState<Error | null>(null)
+
+            const fetchOrders = useCallback(async () => {
+              setIsLoading(true)
+              try {
+                const supabase = createClient()
+                let query = supabase.from('orders').select('*')
+                if (options.status) query = query.eq('status', options.status)
+                const { data, error } = await query
+                if (error) throw error
+                setOrders(data ?? [])
+              } catch (err) {
+                setError(err as Error)
+              } finally {
+                setIsLoading(false)
+              }
+            }, [options.status])
+
+            useEffect(() => { fetchOrders() }, [fetchOrders])
+
+            return { orders, isLoading, error, refetch: fetchOrders }
+          }
+
+    - id: pat-react-error-loading
+      title: Loading and Error States
+      pattern:
+        code: |
+          // app/orders/loading.tsx
+          export default function Loading() {
+            return <OrderListSkeleton />
+          }
+
+          // app/orders/error.tsx
+          'use client'
+
+          export default function Error({
+            error,
+            reset
+          }: {
+            error: Error
+            reset: () => void
+          }) {
+            return (
+              <div>
+                <h2>Error al cargar pedidos</h2>
+                <p>{error.message}</p>
+                <button onClick={reset}>Reintentar</button>
+              </div>
+            )
+          }

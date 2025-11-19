@@ -1,0 +1,113 @@
+metadata:
+  id: code-organization
+  version: 1.0
+  lastUpdated: 2025-11-18
+  references[1]: arch-adr-001
+
+content:
+  title: File Organization
+  purpose: Define the project structure and file organization patterns for Pedidos.
+
+  sections[3]:
+    - id: code-org-structure
+      title: Project Structure
+      tree: |
+        pedidos/
+        ├── .claude/
+        │   └── agents/           # Subagent configurations
+        ├── guidelines/           # Development guidelines (TOON)
+        ├── src/
+        │   ├── app/              # Next.js App Router
+        │   │   ├── (auth)/       # Authenticated routes group
+        │   │   ├── (public)/     # Public routes group
+        │   │   ├── api/          # API routes
+        │   │   └── layout.tsx    # Root layout
+        │   ├── components/       # React components
+        │   │   ├── ui/           # Base UI (Button, Input)
+        │   │   ├── forms/        # Form components
+        │   │   ├── orders/       # Order feature
+        │   │   └── suppliers/    # Supplier feature
+        │   ├── lib/              # Shared libraries
+        │   │   ├── supabase/     # Supabase clients
+        │   │   ├── ai/           # AI integrations
+        │   │   └── utils/        # Utilities
+        │   ├── hooks/            # Custom React hooks
+        │   ├── types/            # TypeScript types
+        │   └── styles/           # Global styles
+        ├── supabase/
+        │   ├── migrations/       # DB migrations
+        │   └── functions/        # Edge Functions
+        ├── public/               # Static assets
+        ├── e2e/                  # E2E tests
+        └── __tests__/            # Test utilities
+
+    - id: code-org-components
+      title: Component Organization
+      patterns[3]:
+        - id: code-org-components-colocation
+          name: Co-location
+          description: Keep related files together
+          pattern:
+            code: |
+              components/orders/
+                OrderItem.tsx        # Component
+                OrderItem.test.tsx   # Tests
+                index.ts             # Re-exports
+          antiPattern:
+            code: |
+              # Don't scatter related files
+              components/OrderItem.tsx
+              tests/OrderItem.test.tsx
+              styles/OrderItem.css
+
+        - id: code-org-components-index
+          name: Index Exports
+          description: Use index.ts for public API
+          pattern:
+            code: |
+              // components/orders/index.ts
+              export { OrderItem } from './OrderItem'
+              export { OrderList } from './OrderList'
+              export { OrderForm } from './OrderForm'
+
+              // Usage
+              import { OrderItem, OrderList } from '@/components/orders'
+
+        - id: code-org-components-private
+          name: Private Components
+          description: Keep internal components unexported
+          pattern:
+            code: |
+              components/orders/
+                OrderItem.tsx           # Exported
+                OrderItemActions.tsx    # Internal, not in index.ts
+
+    - id: code-org-routes
+      title: Route Organization
+      patterns[2]:
+        - id: code-org-routes-groups
+          name: Route Groups
+          description: Use (group) for organization without URL impact
+          pattern:
+            code: |
+              app/
+                (auth)/              # Requires authentication
+                  dashboard/
+                  orders/
+                  suppliers/
+                (public)/            # No auth required
+                  login/
+                  register/
+                  landing/
+
+        - id: code-org-routes-files
+          name: Route Files
+          description: Standard files in each route
+          pattern:
+            code: |
+              app/orders/[id]/
+                page.tsx         # Main UI
+                loading.tsx      # Loading state
+                error.tsx        # Error boundary
+                layout.tsx       # Route-specific layout (optional)
+                actions.ts       # Server Actions
