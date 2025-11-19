@@ -1,0 +1,145 @@
+metadata:
+  id: arch-adr-008
+  version: 1.0
+  lastUpdated: 2025-11-19
+  references[3]: proj-stack,pat-supabase,qual-performance
+
+content:
+  title: "ADR-008: Data Scaling Strategy"
+  purpose: Document the strategy for handling high-volume order_items data growth.
+
+  sections[1]:
+    - id: arch-adr-008-decision
+      title: Decision Record
+      status: Accepted
+      date: 2025-11-19
+
+      context: |
+        The order_items table will grow rapidly as the application scales.
+        Projections: 300 items/order × 365 days × N organizations = exponential growth.
+        At 100 organizations: ~10M items/year. At 1000: ~100M items/year.
+        Need strategy to maintain query performance as data grows.
+
+      decision: Implement indexes + automatic archiving for MVP/medium scale (up to 50M records).
+
+      rationale[5]:
+        - Indexes alone sufficient for ~10M records with proper query patterns
+        - Archiving keeps active table small and performant
+        - 6-month retention covers typical business needs
+        - PostgreSQL handles this scale well with proper indexes
+        - Avoids premature optimization while preparing for growth
+
+      consequences:
+        positive[5]:
+          - Fast queries on active data (last 6 months)
+          - Simple implementation with standard PostgreSQL
+          - Historical data preserved and queryable when needed
+          - Clear upgrade path to TimescaleDB if needed
+          - No additional infrastructure costs for MVP
+        negative[3]:
+          - Historical queries require UNION with archive table
+          - Need to run archival job (weekly cron)
+          - Archive table also grows (eventually needs cold storage)
+
+      scaleLevels[3]{range,items_per_year,strategy}:
+        "< 100 orgs",~10M,Indexes only
+        "100-500 orgs",10-50M,Indexes + Archiving (current)
+        "> 500 orgs",50M+,TimescaleDB or partitioning
+
+      implementation:
+        tables[2]:
+          - name: order_items
+            description: Active items (last 6 months)
+            retention: 6 months after order sent
+          - name: order_items_archive
+            description: Historical items
+            retention: Indefinite (consider cold storage at 2+ years)
+
+        indexes[6]{name,purpose,type}:
+          idx_order_items_order_id,Primary query by order,Standard
+          idx_order_items_supplier_id,Group by supplier,Partial (non-null)
+          idx_order_items_created_at,Time-based queries and partitioning prep,Standard
+          idx_order_items_unclassified,Find items needing assignment,Partial (null supplier)
+          idx_order_items_low_confidence,Find items needing review,Partial (< 0.7)
+          idx_order_items_order_supplier,Composite for order details,Composite
+
+        archivalFunction: |
+          archive_old_order_items() - Moves items from orders where:
+          - status = 'archived'
+          - sent_at < NOW() - INTERVAL '6 months'
+          Returns count of archived items.
+          Run as weekly cron job via pg_cron or external scheduler.
+
+        queryPatterns:
+          activeData: |
+            -- Most queries use order_items directly
+            SELECT * FROM order_items
+            WHERE order_id = $1;
+          historicalData: |
+            -- For reports spanning > 6 months, use the view
+            SELECT * FROM order_items_all
+            WHERE created_at BETWEEN $1 AND $2;
+
+      futureEvolution:
+        timescaleDB:
+          description: Upgrade path for high scale
+          when: "> 50M records or need advanced time-series features"
+          benefits[4]:
+            - Automatic partitioning by time
+            - Built-in compression (90%+ reduction)
+            - Continuous aggregates for dashboards
+            - Compatible with existing PostgreSQL queries
+          migration: |
+            -- Convert to hypertable
+            SELECT create_hypertable('order_items', 'created_at');
+            -- Enable compression
+            ALTER TABLE order_items SET (
+              timescaledb.compress,
+              timescaledb.compress_segmentby = 'order_id'
+            );
+
+        coldStorage:
+          description: For data older than 2 years
+          when: Archive table exceeds 100M records
+          options[2]:
+            - Export to Parquet in Supabase Storage
+            - Move to BigQuery for analytics
+
+      alternatives[4]:
+        - id: arch-adr-008-alt-partition
+          name: Table partitioning from start
+          rejected: true
+          reason: "Premature optimization, adds complexity for MVP scale"
+        - id: arch-adr-008-alt-nosql
+          name: Use document store for items
+          rejected: true
+          reason: "Loses relational benefits, harder to query/aggregate"
+        - id: arch-adr-008-alt-sharding
+          name: Shard by organization
+          rejected: true
+          reason: "Extreme complexity, only needed at massive scale"
+        - id: arch-adr-008-alt-no-archive
+          name: Keep all data in single table
+          rejected: true
+          reason: "Performance degrades, no clear retention policy"
+
+      queryGuidelines:
+        required[4]:
+          - Always include organization_id in WHERE clause
+          - Use appropriate indexes (check EXPLAIN ANALYZE)
+          - Paginate results (LIMIT/OFFSET or cursor)
+          - Filter by date range when possible
+        avoid[3]:
+          - Full table scans without filters
+          - SELECT * when only specific columns needed
+          - Sorting by non-indexed columns on large result sets
+
+      monitoring:
+        metrics[4]:
+          - Table size (pg_total_relation_size)
+          - Index usage (pg_stat_user_indexes)
+          - Slow queries (pg_stat_statements)
+          - Archive job success rate
+        alerts[2]:
+          - order_items > 10M rows (consider increasing archive frequency)
+          - Query time > 100ms on indexed queries (investigate)

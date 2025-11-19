@@ -1,7 +1,7 @@
 metadata:
   id: guidelines-index
   version: 1.0
-  lastUpdated: 2025-11-18
+  lastUpdated: 2025-11-19
   description: "Index of all guidelines. Load specific guidelines on-demand using @path syntax."
 
 usage: |
@@ -38,7 +38,7 @@ categories[7]:
   - id: 02-architecture
     name: Architecture
     description: System architecture and Architecture Decision Records
-    guidelines[8]:
+    guidelines[9]:
       - id: arch-overview
         file: 2.1-architecture-overview.toon
         title: Architecture Overview
@@ -71,6 +71,10 @@ categories[7]:
         file: 2.8-adr-007-authentication.toon
         title: "ADR-007: Authentication"
         topics[4]: auth,multitenancy,roles,invitations
+      - id: arch-adr-008
+        file: 2.9-adr-008-data-scaling.toon
+        title: "ADR-008: Data Scaling"
+        topics[4]: scaling,archiving,indexes,performance
 
   - id: 03-code-standards
     name: Code Standards
@@ -198,3 +202,6 @@ quickLookup:
     git: flow-git
     deployment: flow-deploy
     i18n: ref-i18n
+    scaling: arch-adr-008
+    archiving: arch-adr-008
+    indexes: arch-adr-008
