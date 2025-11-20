@@ -3,6 +3,7 @@ import { updateSession } from '@/lib/supabase/middleware';
 
 // Routes that don't require authentication
 const publicRoutes = [
+  '/',
   '/login',
   '/register',
   '/forgot-password',
@@ -22,12 +23,12 @@ export async function middleware(request: NextRequest) {
 
   // Check if it's a public route
   const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
+    route => pathname === route || pathname.startsWith(`${route}/`)
   );
 
   // Check if it's an auth route (login, register, etc.)
   const isAuthRoute = authRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
+    route => pathname === route || pathname.startsWith(`${route}/`)
   );
 
   // If user is not authenticated and trying to access protected route
