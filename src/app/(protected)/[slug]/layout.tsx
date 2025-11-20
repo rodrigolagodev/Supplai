@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import {
   getOrganizationBySlug,
   getSessionOrRedirect,
@@ -12,10 +13,7 @@ interface OrgLayoutProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function OrganizationLayout({
-  children,
-  params,
-}: OrgLayoutProps) {
+export default async function OrganizationLayout({ children, params }: OrgLayoutProps) {
   const { slug } = await params;
   const session = await getSessionOrRedirect();
 
@@ -37,17 +35,12 @@ export default async function OrganizationLayout({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Home button */}
-              <a
+              <Link
                 href={`/${slug}`}
                 className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                 title="Ir al inicio"
               >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -55,11 +48,8 @@ export default async function OrganizationLayout({
                     d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                   />
                 </svg>
-              </a>
-              <OrgSwitcher
-                currentOrg={organization}
-                organizations={allOrganizations}
-              />
+              </Link>
+              <OrgSwitcher currentOrg={organization} organizations={allOrganizations} />
             </div>
             <UserMenu email={session.email} fullName={session.fullName} />
           </div>
@@ -67,9 +57,7 @@ export default async function OrganizationLayout({
       </header>
 
       {/* Main content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {children}
-      </main>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
     </div>
   );
 }

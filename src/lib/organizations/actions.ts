@@ -28,7 +28,7 @@ export async function createOrganization(
 
   const { data, error } = await supabase.rpc('create_organization_with_membership', {
     org_name: name,
-    org_slug: slug || null,
+    org_slug: slug || '', // RPC expects string, not null
   });
 
   if (error) {
@@ -194,7 +194,7 @@ export async function acceptInvitation(token: string): Promise<OrganizationActio
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc('accept_invitation', {
-    invitation_token: token,
+    token_uuid: token,
   });
 
   if (error) {
@@ -356,18 +356,43 @@ export async function rejectInvitation(token: string): Promise<OrganizationActio
 export async function getInvitationByToken(token: string) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase.rpc('get_invitation_by_token', {
-    invitation_token: token,
-  });
+  // Fetch invitation with organization details
+  const { data: invitation, error } = await supabase
+    .from('invitations')
+    .select('*, organizations(name)')
+    .eq('token', token)
+    .single();
 
-  if (error) {
+  if (error || !invitation) {
     console.error('Error getting invitation:', error);
     return null;
   }
 
-  if (!data || data.length === 0) {
-    return null;
+  // Fetch inviter profile
+  let invitedByName = 'Un usuario';
+  if (invitation.invited_by) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', invitation.invited_by)
+      .single();
+
+    if (profile?.full_name) {
+      invitedByName = profile.full_name;
+    }
   }
 
-  return data[0];
+  const now = new Date();
+  const expiresAt = new Date(invitation.expires_at);
+  const isValid = now < expiresAt && !invitation.accepted_at;
+
+  return {
+    id: invitation.id,
+    email: invitation.email,
+    role: invitation.role,
+    organization_id: invitation.organization_id,
+    organization_name: invitation.organizations?.name || 'Organización desconocida',
+    invited_by_name: invitedByName,
+    is_valid: isValid,
+  };
 }
