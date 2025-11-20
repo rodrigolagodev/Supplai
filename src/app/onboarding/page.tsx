@@ -20,6 +20,20 @@ export default async function OnboardingPage({
   const organizations = await getUserOrganizations();
   const hasOrganizations = organizations.length > 0;
 
+  // If user has organizations but is not an admin in any of them,
+  // they cannot create new organizations
+  if (hasOrganizations && params.create === 'true') {
+    const hasAdminRole = organizations.some(org => org.isAdmin);
+    if (!hasAdminRole) {
+      // Redirect to their first organization
+      const firstOrg = organizations[0];
+      if (firstOrg) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        redirect(`/${firstOrg.slug}` as any);
+      }
+    }
+  }
+
   // If user already has organizations and didn't explicitly request to create one,
   // redirect to dashboard (this handles invited users who got auto-assigned)
   if (hasOrganizations && params.create !== 'true') {
