@@ -49,7 +49,7 @@ export function MessageList() {
                                 : "bg-muted text-foreground rounded-bl-none"
                         )}
                     >
-                        {msg.audio_file_id && (
+                        {msg.audio_file && (
                             <div className="flex items-center gap-2 mb-2 text-xs opacity-80 border-b border-white/20 pb-2">
                                 <FileAudio className="h-3 w-3" />
                                 <span>Audio grabado</span>

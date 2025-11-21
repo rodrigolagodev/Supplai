@@ -94,9 +94,10 @@ export async function POST(request: NextRequest) {
             .from('order_audio_files')
             .insert({
                 order_id: orderId,
+                original_filename: audioFile.name,
                 storage_path: storagePath,
                 file_size_bytes: audioFile.size,
-                processing_status: 'transcribing',
+                processing_status: 'processing',
             })
             .select()
             .single();

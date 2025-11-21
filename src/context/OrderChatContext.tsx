@@ -45,7 +45,7 @@ export function OrderChatProvider({
             order_id: orderId,
             role,
             content,
-            audio_file_id: audioFileId || null,
+            audio_file: audioFileId || null,
             created_at: new Date().toISOString(),
         };
 

@@ -16,7 +16,7 @@ export function useRole(organizationId: string) {
 
     async function getRole() {
       const { data, error } = await supabase.rpc('get_user_role', {
-        org_id: organizationId,
+        organization_id: organizationId,
       });
 
       if (error || !data) {

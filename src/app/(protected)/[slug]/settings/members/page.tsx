@@ -67,7 +67,7 @@ export default function MembersPage() {
 
     // Get current user role
     const { data: roleData } = await supabase.rpc('get_user_role', {
-      org_id: org.id,
+      organization_id: org.id,
     });
 
     if (roleData) {

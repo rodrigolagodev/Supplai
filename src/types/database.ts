@@ -420,20 +420,19 @@ export type Database = {
       }
     }
     Enums: {
-      contact_method: ["email"]
-      item_unit: [
-        "kg",
-        "g",
-        "units",
-        "dozen",
-        "liters",
-        "ml",
-        "packages",
-        "boxes"
-      ]
+      contact_method: "email" | "phone" | "whatsapp"
+      item_unit:
+      | "kg"
+      | "g"
+      | "units"
+      | "dozen"
+      | "liters"
+      | "ml"
+      | "packages"
+      | "boxes"
       membership_role: "admin" | "member"
       processing_status: "pending" | "processing" | "completed" | "failed"
-      order_status: ["draft", "review", "sent", "archived", "cancelled"]
+      order_status: "draft" | "review" | "sent" | "archived" | "cancelled"
       supplier_category:
       | "fruits_vegetables"
       | "meats"
