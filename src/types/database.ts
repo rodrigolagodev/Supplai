@@ -102,6 +102,7 @@ export type Database = {
           original_filename: string
           processed_at: string | null
           status: string
+          processing_status: Database["public"]["Enums"]["processing_status"]
           storage_path: string
           transcription_text: string | null
         }
@@ -116,6 +117,7 @@ export type Database = {
           original_filename: string
           processed_at?: string | null
           status?: string
+          processing_status?: Database["public"]["Enums"]["processing_status"]
           storage_path: string
           transcription_text?: string | null
         }
@@ -130,6 +132,7 @@ export type Database = {
           original_filename?: string
           processed_at?: string | null
           status?: string
+          processing_status?: Database["public"]["Enums"]["processing_status"]
           storage_path?: string
           transcription_text?: string | null
         }
@@ -141,6 +144,41 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      order_conversations: {
+        Row: {
+          id: string
+          order_id: string
+          role: string
+          content: string
+          created_at: string
+          metadata: Json
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          role: string
+          content: string
+          created_at?: string
+          metadata?: Json
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          role?: string
+          content?: string
+          created_at?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_conversations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          }
         ]
       }
       order_items: {
@@ -263,6 +301,11 @@ export type Database = {
           organization_id: string
           phone: string | null
           updated_at: string
+          custom_keywords: string[] | null
+          preferred_contact_method: Database["public"]["Enums"]["contact_method"] | null
+          address: string | null
+          notes: string | null
+          deleted_at: string | null
         }
         Insert: {
           category: Database["public"]["Enums"]["supplier_category"]
@@ -273,6 +316,11 @@ export type Database = {
           organization_id: string
           phone?: string | null
           updated_at?: string
+          custom_keywords?: string[] | null
+          preferred_contact_method?: Database["public"]["Enums"]["contact_method"] | null
+          address?: string | null
+          notes?: string | null
+          deleted_at?: string | null
         }
         Update: {
           category?: Database["public"]["Enums"]["supplier_category"]
@@ -283,6 +331,11 @@ export type Database = {
           organization_id?: string
           phone?: string | null
           updated_at?: string
+          custom_keywords?: string[] | null
+          preferred_contact_method?: Database["public"]["Enums"]["contact_method"] | null
+          address?: string | null
+          notes?: string | null
+          deleted_at?: string | null
         }
         Relationships: [
           {
@@ -379,6 +432,7 @@ export type Database = {
         "boxes"
       ]
       membership_role: "admin" | "member"
+      processing_status: "pending" | "processing" | "completed" | "failed"
       order_status: ["draft", "review", "sent", "archived", "cancelled"]
       supplier_category:
       | "fruits_vegetables"
