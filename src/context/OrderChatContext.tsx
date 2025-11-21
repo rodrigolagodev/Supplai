@@ -13,7 +13,7 @@ type Message = Database['public']['Tables']['order_conversations']['Row'] & {
 };
 
 interface OrderChatContextType {
-    orderId: string;
+    orderId: string | null;
     messages: Message[];
     isProcessing: boolean;
     currentStatus: string; // 'listening' | 'transcribing' | 'parsing' | 'classifying' | 'idle'
@@ -27,24 +27,37 @@ const OrderChatContext = createContext<OrderChatContextType | undefined>(undefin
 
 export function OrderChatProvider({
     children,
-    orderId,
+    orderId: initialOrderId,
+    organizationId,
     initialMessages = []
 }: {
     children: React.ReactNode;
-    orderId: string;
+    orderId: string | null;
+    organizationId: string;
     initialMessages?: Message[];
 }) {
     const router = useRouter();
+    const [orderId, setOrderId] = useState<string | null>(initialOrderId);
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentStatus, setCurrentStatus] = useState('idle');
 
-    // Optimistic update for messages
     const addMessage = useCallback(async (role: 'user' | 'assistant', content: string, audioFileId?: string) => {
+        // Lazy order creation: if no orderId yet, create it now
+        let currentOrderId = orderId;
+        if (!currentOrderId) {
+            const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
+            const newOrder = await createDraftOrder(organizationId);
+            currentOrderId = newOrder.id;
+            setOrderId(currentOrderId);
+            // Update URL to include the order ID
+            // router.replace(`/orders/${currentOrderId}` as any); // This is now handled by the component that calls addMessage
+        }
+
         const tempId = crypto.randomUUID();
         const newMessage: Message = {
             id: tempId,
-            order_id: orderId,
+            order_id: currentOrderId,
             role,
             content,
             audio_file_id: audioFileId || null,
@@ -55,12 +68,12 @@ export function OrderChatProvider({
         setMessages(prev => [...prev, newMessage]);
 
         try {
-            await saveConversationMessage(orderId, role, content, audioFileId);
+            await saveConversationMessage(currentOrderId, role, content, audioFileId);
         } catch (error) {
             console.error('Failed to save message:', error);
             toast.error('Error al guardar el mensaje');
         }
-    }, [orderId]);
+    }, [orderId, organizationId]);
 
     const processText = useCallback(async (text: string) => {
         if (!text.trim()) return;
@@ -73,10 +86,21 @@ export function OrderChatProvider({
         setCurrentStatus('transcribing');
 
         try {
+            // Lazy order creation happens in addMessage, but we need orderId for audio upload
+            // So we need to create it here if not exists
+            let currentOrderId = orderId;
+            if (!currentOrderId) {
+                const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
+                const newOrder = await createDraftOrder(organizationId);
+                currentOrderId = newOrder.id;
+                setOrderId(currentOrderId);
+                router.replace(`/orders/${currentOrderId}` as any);
+            }
+
             // 1. Upload and transcribe
             const formData = new FormData();
             formData.append('audio', audioBlob, 'recording.webm');
-            formData.append('orderId', orderId);
+            formData.append('orderId', currentOrderId);
 
             const response = await fetch('/api/process-audio', {
                 method: 'POST',
@@ -87,7 +111,7 @@ export function OrderChatProvider({
 
             const { transcription, audioFileId } = await response.json();
 
-            // 2. Add user message with audio
+            // 2. Add user message with audio (won't create order again since we just did)
             await addMessage('user', transcription, audioFileId);
 
         } catch (error) {
@@ -97,45 +121,41 @@ export function OrderChatProvider({
             setIsProcessing(false);
             setCurrentStatus('idle');
         }
-    }, [orderId, addMessage]);
+    }, [orderId, organizationId, router, addMessage]);
 
+    // Process order: ensure there are user messages, lazy create order, call batch processing
     const processOrder = useCallback(async () => {
+        // Check for user messages
+        const hasUserMessages = messages.some(m => m.role === 'user');
+        if (!hasUserMessages) {
+            toast.error('No hay mensajes para procesar.');
+            return;
+        }
+
+        // Lazy order creation if needed
+        let currentOrderId = orderId;
+        if (!currentOrderId) {
+            const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
+            const newOrder = await createDraftOrder(organizationId);
+            currentOrderId = newOrder.id;
+            setOrderId(currentOrderId);
+            router.replace(`/orders/${currentOrderId}` as any);
+        }
+
         setIsProcessing(true);
-        setCurrentStatus('parsing'); // or 'processing'
+        setCurrentStatus('parsing');
 
         try {
-            // Call the batch processing action
-            // We need to import processOrderBatch dynamically or pass it via props if it's a server action?
-            // Since we are in a client component context, we can import the server action directly if it's marked 'use server'
-            // But here we are in a context file.
-            // Let's assume we import it at the top.
-
-            // Wait, I need to import processOrderBatch at the top of this file first.
-            // But I can't add imports with this tool easily if I don't replace the top.
-            // I will add the import in a separate step or assume it's available.
-            // Actually, I'll use a dynamic import or just fetch if it was an API route.
-            // But it is a server action.
-
-            // Let's just call the API route wrapper if I made one? No, I made a server action.
-            // I should import it.
-
-            // For now, I will leave this placeholder and fix imports in next step.
             const { processOrderBatch } = await import('@/app/(protected)/orders/actions');
-
-            const result = await processOrderBatch(orderId);
-
+            const result = await processOrderBatch(currentOrderId);
             if (result.redirectUrl) {
                 router.push(result.redirectUrl as any);
                 return;
             }
-
             if (result.message) {
-                // Add the assistant message to local state
                 await addMessage('assistant', result.message);
             }
-
             toast.success('Pedido procesado correctamente');
-
         } catch (error) {
             console.error('Batch processing error:', error);
             toast.error('Error al procesar el pedido');
@@ -144,8 +164,7 @@ export function OrderChatProvider({
             setIsProcessing(false);
             setCurrentStatus('idle');
         }
-    }, [orderId, addMessage]);
-
+    }, [orderId, messages, organizationId, addMessage, router]);
     return (
         <OrderChatContext.Provider value={{
             orderId,

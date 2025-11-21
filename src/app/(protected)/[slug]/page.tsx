@@ -144,8 +144,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                         order.status === 'review' ? 'Revisión' : order.status}
                   </span>
                   <Button asChild variant="ghost" size="sm">
-                    <Link href={order.status === 'sent' ? `/orders/${order.id}/confirmation` as any : `/orders/${order.id}/review` as any}>
-                      Ver
+                    <Link href={
+                      order.status === 'sent' ? `/orders/${order.id}/confirmation` as any :
+                        order.status === 'review' ? `/orders/${order.id}/review` as any :
+                          `/orders/${order.id}` as any
+                    }>
+                      {order.status === 'draft' ? 'Continuar' : 'Ver'}
                     </Link>
                   </Button>
                 </div>

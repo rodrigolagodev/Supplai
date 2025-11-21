@@ -13,14 +13,15 @@ import { Database } from '@/types/database';
 type Message = Database['public']['Tables']['order_conversations']['Row'];
 
 interface OrderChatInterfaceProps {
-    orderId: string;
+    orderId: string | null;
     initialMessages: Message[];
     organizationSlug: string;
+    organizationId: string;
 }
 
-export function OrderChatInterface({ orderId, initialMessages, organizationSlug }: OrderChatInterfaceProps) {
+export function OrderChatInterface({ orderId, initialMessages, organizationSlug, organizationId }: OrderChatInterfaceProps) {
     return (
-        <OrderChatProvider orderId={orderId} initialMessages={initialMessages}>
+        <OrderChatProvider orderId={orderId} initialMessages={initialMessages} organizationId={organizationId}>
             <div className="flex flex-col h-[calc(100vh-4rem)] bg-background">
                 <header className="px-6 py-4 border-b bg-background flex items-center justify-between">
                     <div>

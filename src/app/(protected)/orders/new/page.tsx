@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { createDraftOrder } from '../actions';
+
 import { OrderChatInterface } from '@/components/orders/OrderChatInterface';
 
 export default async function NewOrderPage() {
@@ -31,15 +31,15 @@ export default async function NewOrderPage() {
         );
     }
 
-    // Create a new draft order immediately when visiting this page
-    // This simplifies the flow as we always have an ID to attach messages/audio to
-    const order = await createDraftOrder(membership.organization_id);
+    // We don't create the order immediately anymore (Lazy Creation)
+    // We pass the organizationId so the context can create it when needed
 
     return (
         <OrderChatInterface
-            orderId={order.id}
+            orderId={null}
             initialMessages={[]}
             organizationSlug={membership.organization?.slug || ''}
+            organizationId={membership.organization_id}
         />
     );
 }
