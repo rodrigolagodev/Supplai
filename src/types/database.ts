@@ -152,6 +152,7 @@ export type Database = {
           order_id: string
           role: string
           content: string
+          audio_file_id: string | null
           created_at: string
           metadata: Json
         }
@@ -160,6 +161,7 @@ export type Database = {
           order_id: string
           role: string
           content: string
+          audio_file_id?: string | null
           created_at?: string
           metadata?: Json
         }
@@ -168,6 +170,7 @@ export type Database = {
           order_id?: string
           role?: string
           content?: string
+          audio_file_id?: string | null
           created_at?: string
           metadata?: Json
         }
@@ -239,7 +242,7 @@ export type Database = {
           organization_id: string
           status: Database["public"]["Enums"]["order_status"]
           updated_at: string
-          user_id: string
+          created_by: string
         }
         Insert: {
           created_at?: string
@@ -247,7 +250,7 @@ export type Database = {
           organization_id: string
           status?: Database["public"]["Enums"]["order_status"]
           updated_at?: string
-          user_id: string
+          created_by: string
         }
         Update: {
           created_at?: string

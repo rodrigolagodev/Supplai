@@ -37,7 +37,7 @@ export async function createDraftOrder(organizationId: string) {
         .from('orders')
         .insert({
             organization_id: organizationId,
-            user_id: user.id,
+            created_by: user.id,
             status: 'draft',
         })
         .select()
@@ -96,7 +96,7 @@ export async function saveConversationMessage(
             order_id: orderId,
             role,
             content,
-            audio_file: audioFileId || null,
+            audio_file_id: audioFileId || null,
         });
 
     if (error) {
@@ -262,8 +262,8 @@ export async function processOrderBatch(orderId: string) {
 
     await saveConversationMessage(orderId, 'assistant', summary);
 
-    // Redirect to review page
-    redirect(`/orders/${orderId}/review` as any);
+    // Return redirect URL instead of redirecting directly to avoid client-side try-catch issues
+    return { success: true, redirectUrl: `/orders/${orderId}/review` };
 }
 
 /**

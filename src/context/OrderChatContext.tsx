@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Database } from '@/types/database';
 import { ClassifiedItem } from '@/lib/ai/classifier';
 import { saveConversationMessage, saveParsedItems } from '@/app/(protected)/orders/actions';
@@ -33,6 +34,7 @@ export function OrderChatProvider({
     orderId: string;
     initialMessages?: Message[];
 }) {
+    const router = useRouter();
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentStatus, setCurrentStatus] = useState('idle');
@@ -45,6 +47,7 @@ export function OrderChatProvider({
             order_id: orderId,
             role,
             content,
+            audio_file_id: audioFileId || null,
             created_at: new Date().toISOString(),
             metadata: {},
         };
@@ -120,6 +123,11 @@ export function OrderChatProvider({
             const { processOrderBatch } = await import('@/app/(protected)/orders/actions');
 
             const result = await processOrderBatch(orderId);
+
+            if (result.redirectUrl) {
+                router.push(result.redirectUrl as any);
+                return;
+            }
 
             if (result.message) {
                 // Add the assistant message to local state
