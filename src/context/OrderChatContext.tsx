@@ -45,8 +45,8 @@ export function OrderChatProvider({
             order_id: orderId,
             role,
             content,
-            audio_file: audioFileId || null,
             created_at: new Date().toISOString(),
+            metadata: {},
         };
 
         setMessages(prev => [...prev, newMessage]);

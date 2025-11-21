@@ -48,7 +48,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <Link href="/orders/new">
+              <Link href={"/orders/new" as any}>
                 Crear Pedido
               </Link>
             </Button>

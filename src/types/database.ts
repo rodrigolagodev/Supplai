@@ -457,11 +457,15 @@ export type Tables<
   | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
   | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+    // @ts-expect-error - Auto-generated Supabase utility type
     Database[PublicTableNameOrOptions["schema"]]["Views"])
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+    // @ts-expect-error - Auto-generated Supabase utility type
     Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
@@ -482,9 +486,11 @@ export type TablesInsert<
   | keyof PublicSchema["Tables"]
   | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
     Insert: infer I
   }
@@ -503,9 +509,11 @@ export type TablesUpdate<
   | keyof PublicSchema["Tables"]
   | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
     Update: infer U
   }
@@ -524,9 +532,11 @@ export type Enums<
   | keyof PublicSchema["Enums"]
   | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
   : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
   ? PublicSchema["Enums"][PublicEnumNameOrOptions]
@@ -539,9 +549,11 @@ export type CompositeTypes<
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
   }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
   : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  // @ts-expect-error - Auto-generated Supabase utility type
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
   ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]

@@ -99,8 +99,9 @@ export function SupplierListItem({ supplier, slug, isAdmin, onDelete }: Supplier
             <div>
               <dt className="text-xs font-medium text-gray-500">Método de Contacto Preferido</dt>
               <dd className="mt-1 text-sm text-gray-900">
-                {contactMethodLabels[supplier.preferred_contact_method] ||
-                  supplier.preferred_contact_method}
+                {supplier.preferred_contact_method
+                  ? (contactMethodLabels[supplier.preferred_contact_method] || supplier.preferred_contact_method)
+                  : 'No especificado'}
               </dd>
             </div>
 

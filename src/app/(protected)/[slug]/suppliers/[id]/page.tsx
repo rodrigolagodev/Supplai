@@ -33,6 +33,8 @@ export default async function EditSupplierPage({
         slug={slug}
         initialData={{
           ...supplier,
+          email: supplier.email ?? '',
+          preferred_contact_method: supplier.preferred_contact_method ?? 'email',
           phone: supplier.phone ?? undefined,
           address: supplier.address ?? undefined,
           notes: supplier.notes ?? undefined,
