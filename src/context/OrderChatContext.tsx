@@ -1,9 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Database } from '@/types/database';
 import { saveConversationMessage } from '@/app/(protected)/orders/actions';
 import { toast } from 'sonner';
+import { useOrderLifecycle } from '@/hooks/useOrderLifecycle';
 
 type Message = Database['public']['Tables']['order_conversations']['Row'] & {
   audio_file?: Database['public']['Tables']['order_audio_files']['Row'] | null;
@@ -39,33 +40,43 @@ export function OrderChatProvider({
   onOrderCreated?: (orderId: string) => void;
   onOrderProcessed?: (redirectUrl: string) => void;
 }) {
-  const [orderId, setOrderId] = useState<string | null>(initialOrderId);
+  // Use centralized order lifecycle hook to prevent race conditions
+  const {
+    orderId,
+    ensureOrderExists: ensureOrderExistsFromHook,
+    setOrderId,
+  } = useOrderLifecycle(organizationId);
+
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStatus, setCurrentStatus] = useState('idle');
 
-  const ensureOrderExists = useCallback(async () => {
-    // If order already exists, return it
-    if (orderId) {
-      return orderId;
+  // Initialize orderId from props if provided
+  useEffect(() => {
+    if (initialOrderId && !orderId) {
+      setOrderId(initialOrderId);
     }
+  }, [initialOrderId, orderId, setOrderId]);
 
-    // Create new order
-    const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
-    const newOrder = await createDraftOrder(organizationId);
-    setOrderId(newOrder.id);
+  /**
+   * Wrapper around the hook's ensureOrderExists that adds
+   * the onOrderCreated callback notification
+   */
+  const ensureOrderExists = useCallback(async (): Promise<string> => {
+    const wasCreated = !orderId;
+    const currentOrderId = await ensureOrderExistsFromHook();
 
     // Notify parent component about order creation
-    // Parent will handle navigation if needed
-    if (onOrderCreated) {
+    // Only notify if this call actually created the order
+    if (wasCreated && onOrderCreated) {
       // Defer callback to avoid interrupting current operation
       setTimeout(() => {
-        onOrderCreated(newOrder.id);
+        onOrderCreated(currentOrderId);
       }, 0);
     }
 
-    return newOrder.id;
-  }, [orderId, organizationId, onOrderCreated]);
+    return currentOrderId;
+  }, [orderId, ensureOrderExistsFromHook, onOrderCreated]);
 
   const addMessage = useCallback(
     async (role: 'user' | 'assistant', content: string, audioFileId?: string) => {
