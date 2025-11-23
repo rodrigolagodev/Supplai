@@ -193,7 +193,7 @@ export class OrderCommands {
     }
 
     // 2. Create Supplier Orders (Idempotent)
-    const supplierOrders = await OrderService.createSupplierOrders(orderId);
+    const supplierOrders = await OrderService.createSupplierOrders(orderId, this.supabase);
 
     if (supplierOrders.length === 0) {
       throw new Error('No items found to send');
@@ -201,7 +201,11 @@ export class OrderCommands {
 
     // 3. Enqueue Jobs
     for (const supplierOrder of supplierOrders) {
-      await JobQueue.enqueue('SEND_SUPPLIER_ORDER', { supplierOrderId: supplierOrder.id });
+      await JobQueue.enqueue(
+        'SEND_SUPPLIER_ORDER',
+        { supplierOrderId: supplierOrder.id },
+        this.supabase
+      );
     }
 
     // 4. Update main order status to 'sending' immediately for UI feedback
