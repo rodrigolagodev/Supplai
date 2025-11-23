@@ -79,21 +79,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to upload audio' }, { status: 500 });
     }
 
-    console.log('Audio file details:', {
+    /* console.log('Audio file details:', {
       name: audioFile.name,
       type: audioFile.type,
       size: audioFile.size,
-    });
+    }); */
 
     // 3. Create database record for audio file
     const { data: audioRecord, error: dbError } = await supabase
       .from('order_audio_files')
       .insert({
         order_id: orderId,
-        // original_filename: audioFile.name, // Column not in DB schema
         storage_path: storagePath,
         file_size_bytes: audioFile.size,
-        processing_status: 'transcribing', // Schema allows: pending, transcribing, completed, failed
+        processing_status: 'pending',
       })
       .select()
       .single();

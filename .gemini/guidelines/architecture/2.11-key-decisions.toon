@@ -1,0 +1,61 @@
+metadata:
+  id: arch-decisions
+  version: 1.0
+  lastUpdated: 2025-11-22
+  references[1]: arch-overview
+
+content:
+  title: Key Decisions Log
+  purpose: Consolidated list of architectural and product decisions to provide context on "why" things are the way they are.
+
+  sections[3]:
+    - id: decisions-tech-stack
+      title: Technology Stack
+      decisions[4]:
+        - subject: Frontend Framework
+          decision: Next.js 16 (App Router)
+          reason: "Server Components for performance, robust routing, Vercel integration."
+          reference: arch-adr-001
+        - subject: Backend Platform
+          decision: Supabase
+          reason: "Unified DB, Auth, and Edge Functions. Postgres is reliable. RLS for security."
+          reference: arch-adr-002
+        - subject: Styling
+          decision: Tailwind CSS 4
+          reason: "Rapid development, co-location of styles, small bundle size."
+        - subject: AI Models
+          decision: Groq Whisper (STT) + Gemini 1.5 Flash (Parsing)
+          reason: "Groq for speed/cost. Gemini for cost/performance ratio in Spanish parsing."
+          reference: arch-adr-004, arch-adr-005
+
+    - id: decisions-architecture
+      title: Architecture & Design
+      decisions[4]:
+        - subject: Communication Flow
+          decision: Unidirectional (Send Only)
+          reason: "MVP scope reduction. Managing supplier responses (WhatsApp/Email replies) is complex and high friction."
+          impact: "We do not track if supplier 'accepted' the order, only that it was sent."
+        - subject: Multi-tenancy
+          decision: Organization-based
+          reason: "Allows team collaboration. Data isolated by organization_id via RLS."
+          reference: arch-adr-007
+        - subject: Authentication
+          decision: Email/Password only (MVP)
+          reason: "Simplicity. Avoids reliance on 3rd party providers (Google) for non-tech users."
+          reference: arch-adr-007
+        - subject: Internationalization
+          decision: Spanish (LATAM) only
+          reason: "Target market focus. Hardcoded strings acceptable for MVP, but i18n structure preferred."
+
+    - id: decisions-ux
+      title: User Experience
+      decisions[3]:
+        - subject: Input Method
+          decision: Voice-First
+          reason: "Kitchen environment (wet/dirty hands). Speed of entry."
+        - subject: Review Step
+          decision: Mandatory
+          reason: "AI is probabilistic. Trust but verify. Prevents wrong orders."
+        - subject: Learning Curve
+          decision: Zero / Minimal
+          reason: "Staff turnover is high. App must be usable immediately without training."

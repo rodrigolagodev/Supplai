@@ -2,44 +2,46 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 
 if (!process.env.GEMINI_API_KEY) {
-    console.warn('Missing GEMINI_API_KEY environment variable');
+  console.warn('Missing GEMINI_API_KEY environment variable');
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({
-    model: 'models/gemini-2.0-flash',
-    generationConfig: {
-        temperature: 0.1, // Low temperature for deterministic parsing
-        responseMimeType: "application/json",
-    }
+  model: 'models/gemini-2.0-flash',
+  generationConfig: {
+    temperature: 0.1, // Low temperature for deterministic parsing
+    responseMimeType: 'application/json',
+  },
 });
 
 // Schema for parsed items
 export const ParsedItemSchema = z.object({
-    product: z.string(),
-    quantity: z.number(),
-    unit: z.enum(['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes']),
-    category: z.enum(['fruits_vegetables', 'meats', 'fish_seafood', 'dry_goods', 'dairy', 'beverages']).optional(),
-    confidence: z.number().min(0).max(1),
-    original_text: z.string().optional(),
-    supplier_id: z.string().nullable().optional(),
-    supplier_name: z.string().nullable().optional(),
+  product: z.string(),
+  quantity: z.number(),
+  unit: z.enum(['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes']),
+  category: z
+    .enum(['fruits_vegetables', 'meats', 'fish_seafood', 'dry_goods', 'dairy', 'beverages'])
+    .optional(),
+  confidence: z.number().min(0).max(1),
+  original_text: z.string().optional(),
+  supplier_id: z.string().nullable().optional(),
+  supplier_name: z.string().nullable().optional(),
 });
 
 export type ParsedItem = z.infer<typeof ParsedItemSchema>;
 
 export const ParseResultSchema = z.object({
-    items: z.array(ParsedItemSchema),
+  items: z.array(ParsedItemSchema),
 });
 
 /**
  * Supplier type for classification context
  */
 export interface SupplierContext {
-    id: string;
-    name: string;
-    category: string | null;
-    custom_keywords: string[] | null;
+  id: string;
+  name: string;
+  category: string | null;
+  custom_keywords: string[] | null;
 }
 
 /**
@@ -47,19 +49,23 @@ export interface SupplierContext {
  * with supplier context for intelligent classification
  */
 export async function parseOrderText(
-    text: string,
-    suppliers: SupplierContext[] = []
+  text: string,
+  suppliers: SupplierContext[] = []
 ): Promise<ParsedItem[]> {
-    return withRetry(async () => {
-        try {
-            // Build supplier context for prompt
-            const supplierContext = suppliers.length > 0
-                ? `\n\nProveedores disponibles:\n${suppliers.map(s =>
-                    `- ID: ${s.id}\n  Nombre: ${s.name}\n  Categoría: ${s.category || 'sin categoría'}\n  Keywords: [${s.custom_keywords?.join(', ') || 'ninguna'}]`
-                ).join('\n')}\n`
-                : '';
+  return withRetry(async () => {
+    try {
+      // Build supplier context for prompt
+      const supplierContext =
+        suppliers.length > 0
+          ? `\n\nProveedores disponibles:\n${suppliers
+              .map(
+                s =>
+                  `- ID: ${s.id}\n  Nombre: ${s.name}\n  Categoría: ${s.category || 'sin categoría'}\n  Keywords: [${s.custom_keywords?.join(', ') || 'ninguna'}]`
+              )
+              .join('\n')}\n`
+          : '';
 
-            const prompt = `
+      const prompt = `
                 Eres un asistente experto en gestión de pedidos para restaurantes.
                 Tu tarea es extraer una lista estructurada de productos, cantidades y unidades del siguiente texto de un pedido,
                 Y ADEMÁS asignar cada item al proveedor más apropiado.
@@ -75,13 +81,15 @@ export async function parseOrderText(
                 - "botella", "litro" -> 'liters'
                 4. Intenta inferir la categoría del producto de esta lista: ['fruits_vegetables', 'meats', 'fish_seafood', 'dry_goods', 'dairy', 'beverages'].
                 5. Asigna un nivel de confianza (0.0 a 1.0) basado en qué tan claro es el pedido.
-                ${suppliers.length > 0
+                ${
+                  suppliers.length > 0
                     ? `6. IMPORTANTE: Asigna cada item al proveedor más apropiado considerando:
                 - La categoría del proveedor debe coincidir con el tipo de producto
                 - Las keywords del proveedor pueden indicar productos específicos que vende
                 - Si ningún proveedor es apropiado, deja supplier_id como null
                 - Incluye el nombre del proveedor asignado en supplier_name`
-                    : ''}
+                    : ''
+                }
 
                 Responde SOLO con un objeto JSON con la siguiente estructura:
                 {
@@ -93,52 +101,49 @@ export async function parseOrderText(
                     "category": "fruits_vegetables",
                     "confidence": 0.95,
                     "original_text": "texto original del item (ej: 'dos kilos y medio de tomate')",
-                    ${suppliers.length > 0
-                    ? `"supplier_id": "id del proveedor asignado o null",
+                    ${
+                      suppliers.length > 0
+                        ? `"supplier_id": "id del proveedor asignado o null",
                     "supplier_name": "nombre del proveedor asignado o null"`
-                    : ''}
+                        : ''
+                    }
                     }
                 ]
                 }
             `;
 
-            const result = await model.generateContent(prompt);
-            const response = result.response;
-            const textResponse = response.text();
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const textResponse = response.text();
 
-            // Parse JSON response
-            const jsonResponse = JSON.parse(textResponse);
+      // Parse JSON response
+      const jsonResponse = JSON.parse(textResponse);
 
-            // Validate with Zod
-            const parsed = ParseResultSchema.parse(jsonResponse);
+      // Validate with Zod
+      const parsed = ParseResultSchema.parse(jsonResponse);
 
-            return parsed.items;
-
-        } catch (error) {
-            console.error('Gemini parsing error:', error);
-            throw error;
-        }
-    });
+      return parsed.items;
+    } catch (error) {
+      console.error('Gemini parsing error:', error);
+      throw error;
+    }
+  });
 }
 
 /**
  * Retry helper with exponential backoff
  */
-async function withRetry<T>(
-    fn: () => Promise<T>,
-    maxRetries = 3,
-    baseDelay = 1000
-): Promise<T> {
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            return await fn();
-        } catch (error) {
-            if (i === maxRetries - 1) throw error;
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
 
-            const delay = baseDelay * Math.pow(2, i);
-            console.log(`Retrying Gemini request (attempt ${i + 1}/${maxRetries}) in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
+      const delay = baseDelay * Math.pow(2, i);
+      console.warn(`Retrying Gemini request (attempt ${i + 1}/${maxRetries}) in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-    throw new Error('Max retries exceeded');
+  }
+  throw new Error('Max retries exceeded');
 }

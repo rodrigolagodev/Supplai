@@ -35,13 +35,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   }
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: recentOrders } = await supabase
     .from('orders')
     .select('id, created_at, status, sent_at, created_by')
     .eq('organization_id', organization.id)
     .order('created_at', { ascending: false })
-    .limit(10) as any;
+    .limit(10);
 
   return (
     <div className="space-y-6">
@@ -61,9 +60,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <Link href={"/orders/new" as any}>
-                Crear Pedido
-              </Link>
+              <Link href="/orders/new">Crear Pedido</Link>
             </Button>
           </CardContent>
         </Card>
@@ -75,9 +72,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline" className="w-full">
-              <Link href={`/${slug}/suppliers`}>
-                Ver Proveedores
-              </Link>
+              <Link href={`/${slug}/suppliers`}>Ver Proveedores</Link>
             </Button>
           </CardContent>
         </Card>
@@ -88,8 +83,8 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             <CardDescription>Revisa pedidos anteriores</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full">
-              Ver Historial
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`/${slug}/history`}>Ver Historial</Link>
             </Button>
           </CardContent>
         </Card>
@@ -102,9 +97,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             </CardHeader>
             <CardContent>
               <Button asChild variant="outline" className="w-full">
-                <Link href={`/${slug}/settings/members`}>
-                  Gestionar Equipo
-                </Link>
+                <Link href={`/${slug}/settings/members`}>Gestionar Equipo</Link>
               </Button>
             </CardContent>
           </Card>
@@ -123,32 +116,51 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {recentOrders.map((order: any) => (
-              <div key={order.id} className="flex items-center justify-between p-6 hover:bg-gray-50">
+            {recentOrders.map(order => (
+              <div
+                key={order.id}
+                className="flex items-center justify-between p-6 hover:bg-gray-50"
+              >
                 <div className="flex flex-col space-y-1">
-                  <span className="font-medium text-gray-900">
-                    Pedido #{order.id.slice(0, 8)}
-                  </span>
+                  <span className="font-medium text-gray-900">Pedido #{order.id.slice(0, 8)}</span>
                   <span className="text-sm text-gray-500">
-                    {formatDistanceToNow(new Date(order.created_at), { addSuffix: true, locale: es })}
+                    {formatDistanceToNow(new Date(order.created_at), {
+                      addSuffix: true,
+                      locale: es,
+                    })}
                   </span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                    ${order.status === 'sent' ? 'bg-green-100 text-green-800' :
-                      order.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                        order.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'}`}>
-                    {order.status === 'sent' ? 'Enviado' :
-                      order.status === 'draft' ? 'Borrador' :
-                        order.status === 'review' ? 'Revisión' : order.status}
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                    ${
+                      order.status === 'sent'
+                        ? 'bg-green-100 text-green-800'
+                        : order.status === 'draft'
+                          ? 'bg-gray-100 text-gray-800'
+                          : order.status === 'review'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {order.status === 'sent'
+                      ? 'Enviado'
+                      : order.status === 'draft'
+                        ? 'Borrador'
+                        : order.status === 'review'
+                          ? 'Revisión'
+                          : order.status}
                   </span>
                   <Button asChild variant="ghost" size="sm">
-                    <Link href={
-                      order.status === 'sent' ? `/orders/${order.id}/confirmation` as any :
-                        order.status === 'review' ? `/orders/${order.id}/review` as any :
-                          `/orders/${order.id}` as any
-                    }>
+                    <Link
+                      href={
+                        order.status === 'sent'
+                          ? `/orders/${order.id}/details`
+                          : order.status === 'review'
+                            ? `/orders/${order.id}/review`
+                            : `/orders/${order.id}`
+                      }
+                    >
                       {order.status === 'draft' ? 'Continuar' : 'Ver'}
                     </Link>
                   </Button>

@@ -1,0 +1,100 @@
+metadata:
+  id: arch-flows
+  version: 1.0
+  lastUpdated: 2025-11-22
+  references[2]: arch-overview,proj-entities
+
+content:
+  title: System Flows
+  purpose: Detailed documentation of core user and system flows to ensure consistent understanding by agents and developers.
+
+  sections[4]:
+    - id: flow-order-creation
+      title: Order Creation Flow
+      context: The primary flow where users input order data via voice or text.
+      steps[6]:
+        - step: 1
+          name: Input Capture
+          actor: User
+          action: "User presses microphone button (Voice) or types in text area (Text)."
+          details: "Voice recording uses MediaRecorder API. Text input is standard textarea."
+        - step: 2
+          name: Transcription (Voice only)
+          actor: System (Groq Whisper)
+          action: "Audio blob sent to Groq Whisper API."
+          output: "Raw Spanish text string."
+          errorHandling: "If transcription fails, show error toast and allow retry or manual text entry."
+        - step: 3
+          name: Parsing
+          actor: System (Gemini 1.5 Flash)
+          action: "Text sent to Gemini with parsing prompt."
+          details: "Extracts product, quantity, unit, and category. Normalizes quantities (e.g., 'half kilo' -> 0.5)."
+        - step: 4
+          name: Classification
+          actor: System
+          action: "Match parsed items to existing suppliers."
+          logic: |
+            1. Exact match on product name.
+            2. Match on defined 'custom keywords' for suppliers.
+            3. Fallback to category match (e.g., 'apples' -> 'Fruits & Veg' supplier).
+            4. If no match, mark as 'Unclassified'.
+        - step: 5
+          name: Draft Creation
+          actor: System
+          action: "Create Order record with status 'draft' and associated OrderItems."
+        - step: 6
+          name: Redirect
+          actor: System
+          action: "Redirect user to Order Review screen."
+
+    - id: flow-order-review
+      title: Order Review & Editing
+      context: Mandatory human review step before sending orders.
+      actions[5]:
+        - name: Edit Item
+          description: "User modifies quantity, unit, or product name."
+          impact: "Updates OrderItem record."
+        - name: Move Item
+          description: "User reassigns item to a different supplier."
+          impact: "Updates supplier_id on OrderItem. If target supplier doesn't exist in order, creates visual group."
+        - name: Delete Item
+          description: "User removes item from order."
+          impact: "Deletes OrderItem record."
+        - name: Assign Unclassified
+          description: "User assigns a supplier to an unclassified item."
+          impact: "Updates supplier_id. System asks if this mapping should be remembered (future feature)."
+        - name: Add Item
+          description: "User manually adds a forgotten item."
+          impact: "Creates new OrderItem in current order."
+
+    - id: flow-order-delivery
+      title: Delivery Flow
+      context: Sending the approved order to suppliers.
+      steps[4]:
+        - step: 1
+          name: Confirmation
+          actor: User
+          action: "User clicks 'Send Order' button."
+        - step: 2
+          name: Processing
+          actor: System
+          action: "Group items by supplier. Generate email content for each supplier."
+        - step: 3
+          name: Transmission
+          actor: System (Resend)
+          action: "Send individual emails to each supplier."
+          details: "Email contains list of items, quantities, and restaurant contact info."
+        - step: 4
+          name: Finalization
+          actor: System
+          action: "Update Order status to 'sent'. Update 'sent_at' timestamp. Redirect to History."
+
+    - id: flow-supplier-management
+      title: Supplier Management
+      context: Managing the list of providers.
+      actions[2]:
+        - name: Create Supplier
+          inputs: "Name, Email/Phone, Category, Custom Keywords."
+          validation: "Email or Phone required. Name required."
+        - name: Edit Supplier
+          details: "Updating keywords improves future classification accuracy."

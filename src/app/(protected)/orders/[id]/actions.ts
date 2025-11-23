@@ -20,19 +20,16 @@ export async function getOrderReview(orderId: string) {
   }
 
   // DEBUG: Check memberships
-  const { data: myMemberships } = await supabase
-    .from('memberships')
-    .select('organization_id, role')
-    .eq('user_id', user.id);
-  console.log('User:', user.id);
-  console.log('Memberships:', myMemberships);
+  // const { data: myMemberships } = await supabase
+  //   .from('memberships')
+  //   .select('organization_id, role')
+  //   .eq('user_id', user.id);
 
   // DEBUG: Check visible orders
-  const { data: visibleOrders } = await supabase
-    .from('orders')
-    .select('id, organization_id')
-    .limit(5);
-  console.log('Visible orders sample:', visibleOrders);
+  // const { data: visibleOrders } = await supabase
+  //   .from('orders')
+  //   .select('id, organization_id')
+  //   .limit(5);
 
   // Get order first (without join to isolate errors)
   const { data: order, error: orderError } = await supabase
@@ -42,6 +39,19 @@ export async function getOrderReview(orderId: string) {
     .single();
 
   if (orderError || !order) {
+    // Check if this is a supplier_order (which can't be reviewed)
+    const { data: supplierOrder } = await supabase
+      .from('supplier_orders')
+      .select('id')
+      .eq('id', orderId)
+      .single();
+
+    if (supplierOrder) {
+      throw new Error(
+        'Los pedidos de proveedor individuales no se pueden revisar. Usa la vista de detalles.'
+      );
+    }
+
     console.error('Error fetching order:', orderError);
     console.error('OrderId:', orderId);
     throw new Error('Pedido no encontrado');
@@ -101,6 +111,189 @@ export async function getOrderReview(orderId: string) {
     items: items || [],
     suppliers: suppliers || [],
     userRole: membership.role,
+  };
+}
+
+/**
+ * Get order details for read-only view (sent/archived orders)
+ * This function automatically detects if the ID is a regular order or a supplier_order
+ */
+export async function getOrderDetails(orderId: string) {
+  const supabase = await createClient();
+
+  // Get user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('No autenticado');
+  }
+
+  // First, try to fetch as a regular order
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+
+  // If not found as an order, try as supplier_order
+  if (orderError || !order) {
+    const { data: supplierOrder } = await supabase
+      .from('supplier_orders')
+      .select('id')
+      .eq('id', orderId)
+      .single();
+
+    if (supplierOrder) {
+      // Delegate to supplier order handler
+      return getSupplierOrderDetails(orderId);
+    }
+
+    // Neither found, throw error
+    console.error('Error fetching order:', orderError);
+    throw new Error('Pedido no encontrado');
+  }
+
+  // Get organization details
+  const { data: organization, error: orgError } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('id', order.organization_id)
+    .single();
+
+  if (orgError || !organization) {
+    console.error('Error fetching organization:', orgError);
+    throw new Error('Organización no encontrada');
+  }
+
+  // Combine for compatibility
+  const orderWithOrg = { ...order, organization };
+
+  // Verify user membership
+  const { data: membership } = await supabase
+    .from('memberships')
+    .select('role')
+    .eq('organization_id', order.organization_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    throw new Error('No tienes acceso a este pedido');
+  }
+
+  // Get all items with supplier info
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('*, supplier:suppliers(name, category)')
+    .eq('order_id', orderId)
+    .order('created_at');
+
+  if (itemsError) {
+    throw new Error('Error al cargar items');
+  }
+
+  // Get suppliers
+  const { data: suppliers, error: suppliersError } = await supabase
+    .from('suppliers')
+    .select('*')
+    .eq('organization_id', order.organization_id)
+    .order('name');
+
+  if (suppliersError) {
+    throw new Error('Error al cargar proveedores');
+  }
+
+  return {
+    order: orderWithOrg,
+    items: items || [],
+    suppliers: suppliers || [],
+  };
+}
+
+/**
+ * Get supplier order details for read-only view (individual supplier order)
+ * This is used when viewing a specific supplier_order from the history
+ */
+export async function getSupplierOrderDetails(supplierOrderId: string) {
+  const supabase = await createClient();
+
+  // Get user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('No autenticado');
+  }
+
+  // Get supplier_order with related order and supplier info
+  const { data: supplierOrder, error: supplierOrderError } = await supabase
+    .from('supplier_orders')
+    .select(
+      `
+      *,
+      order:orders!inner(*),
+      supplier:suppliers(*)
+    `
+    )
+    .eq('id', supplierOrderId)
+    .single();
+
+  if (supplierOrderError || !supplierOrder) {
+    console.error('Error fetching supplier order:', supplierOrderError);
+    throw new Error('Pedido de proveedor no encontrado');
+  }
+
+  const order = supplierOrder.order;
+
+  // Get organization details
+  const { data: organization, error: orgError } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('id', order.organization_id)
+    .single();
+
+  if (orgError || !organization) {
+    console.error('Error fetching organization:', orgError);
+    throw new Error('Organización no encontrada');
+  }
+
+  // Verify user membership
+  const { data: membership } = await supabase
+    .from('memberships')
+    .select('role')
+    .eq('organization_id', order.organization_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    throw new Error('No tienes acceso a este pedido');
+  }
+
+  // Get items ONLY for this specific supplier
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('*, supplier:suppliers(name, category)')
+    .eq('order_id', order.id)
+    .eq('supplier_id', supplierOrder.supplier_id)
+    .order('created_at');
+
+  if (itemsError) {
+    throw new Error('Error al cargar items');
+  }
+
+  // Get only this supplier (not all suppliers)
+  const supplier = supplierOrder.supplier;
+  const suppliers = supplier ? [supplier] : [];
+
+  // Combine for compatibility
+  const orderWithOrg = { ...order, organization };
+
+  return {
+    order: orderWithOrg,
+    items: items || [],
+    suppliers,
+    isSupplierOrder: true,
+    supplierOrder,
   };
 }
 
@@ -223,25 +416,64 @@ export async function saveOrderItems(orderId: string, items: any[]) {
     throw new Error('No autenticado');
   }
 
-  // Prepare data for upsert
-  // We only want to update editable fields and ensure order_id/user ownership
-  const itemsToUpsert = items.map(item => ({
-    id: item.id.startsWith('temp-') ? undefined : item.id, // Let DB generate ID for new items
-    order_id: orderId,
-    supplier_id: item.supplier_id,
-    product: item.product,
-    quantity: item.quantity,
-    unit: item.unit as Database['public']['Enums']['item_unit'],
-    confidence_score: item.confidence_score,
-    original_text: item.original_text,
-    // Don't include created_at to let DB handle it
-  }));
+  // Separate new items from existing items
+  const newItems = items.filter(item => item.id.toString().startsWith('temp'));
+  const existingItems = items.filter(item => !item.id.toString().startsWith('temp'));
 
-  const { error } = await supabase.from('order_items').upsert(itemsToUpsert, { onConflict: 'id' });
+  // Helper to sanitize unit
+  const sanitizeUnit = (unit: string): Database['public']['Enums']['item_unit'] => {
+    if (unit === 'unidades') return 'units';
+    // Add other mappings if necessary, or return as is if it matches the enum
+    const validUnits = ['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes'];
+    if (validUnits.includes(unit)) return unit as Database['public']['Enums']['item_unit'];
+    return 'units'; // Default fallback
+  };
 
-  if (error) {
-    console.error('Error saving items:', error);
-    throw new Error('Error al guardar los items');
+  // 1. Insert new items
+  if (newItems.length > 0) {
+    const itemsToInsert = newItems.map(item => ({
+      order_id: orderId,
+      supplier_id: item.supplier_id,
+      product: item.product,
+      quantity: item.quantity,
+      unit: sanitizeUnit(item.unit),
+      confidence_score: item.confidence_score,
+      original_text: item.original_text,
+    }));
+
+    const { error: insertError } = await supabase.from('order_items').insert(itemsToInsert);
+
+    if (insertError) {
+      console.error('Error inserting new items:', insertError);
+      throw new Error('Error al guardar nuevos items');
+    }
+  }
+
+  // 2. Update existing items
+  if (existingItems.length > 0) {
+    // Use sequential updates to avoid issues with upsert and permissions
+    for (const item of existingItems) {
+      const { error: updateError } = await supabase
+        .from('order_items')
+        .update({
+          supplier_id: item.supplier_id,
+          product: item.product,
+          quantity: item.quantity,
+          unit: sanitizeUnit(item.unit),
+          confidence_score: item.confidence_score,
+          // We don't update order_id or original_text as they shouldn't change
+        })
+        .eq('id', item.id)
+        .eq('order_id', orderId); // Extra safety check
+
+      if (updateError) {
+        console.error(`Error updating item ${item.id}:`, updateError);
+        // Include specific error details for debugging
+        throw new Error(
+          `Error al actualizar item "${item.product}": ${updateError.message} (${updateError.details || 'Sin detalles'})`
+        );
+      }
+    }
   }
 
   revalidatePath(`/orders/${orderId}/review`);

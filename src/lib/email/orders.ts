@@ -3,44 +3,47 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export interface OrderItemEmailData {
-    product: string;
-    quantity: number;
-    unit: string;
-    supplierName: string;
+  product: string;
+  quantity: number;
+  unit: string;
+  supplierName: string;
 }
 
 interface SendOrderEmailParams {
-    to: string;
-    orderId: string;
-    organizationName: string;
-    items: OrderItemEmailData[];
+  to: string;
+  orderId: string;
+  organizationName: string;
+  items: OrderItemEmailData[];
 }
 
 export async function sendOrderEmail({
-    to,
-    orderId,
-    organizationName,
-    items,
+  to,
+  // orderId,
+  organizationName,
+  items,
 }: SendOrderEmailParams) {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    // In the future, we might want to link to a supplier view of the order
-    // For now, maybe just link to the dashboard or no link
-    const _orderUrl = `${siteUrl}/orders/${orderId}`;
+  // const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  // In the future, we might want to link to a supplier view of the order
+  // For now, maybe just link to the dashboard or no link
+  // const _orderUrl = `${siteUrl}/orders/${orderId}`;
 
-    // Group items by supplier for the email body
-    const itemsBySupplier = items.reduce((acc, item) => {
-        if (!acc[item.supplierName]) {
-            acc[item.supplierName] = [];
-        }
-        acc[item.supplierName]?.push(item);
-        return acc;
-    }, {} as Record<string, OrderItemEmailData[]>);
+  // Group items by supplier for the email body
+  const itemsBySupplier = items.reduce(
+    (acc, item) => {
+      if (!acc[item.supplierName]) {
+        acc[item.supplierName] = [];
+      }
+      acc[item.supplierName]?.push(item);
+      return acc;
+    },
+    {} as Record<string, OrderItemEmailData[]>
+  );
 
-    const { data, error } = await resend.emails.send({
-        from: 'Pedidos <orders@resend.dev>', // Change to your domain in production
-        to: [to],
-        subject: `Nuevo pedido de ${organizationName}`,
-        html: `
+  const { data, error } = await resend.emails.send({
+    from: 'Pedidos <orders@resend.dev>', // Change to your domain in production
+    to: [to],
+    subject: `Nuevo pedido de ${organizationName}`,
+    html: `
       <!DOCTYPE html>
       <html>
         <head>
@@ -57,18 +60,26 @@ export async function sendOrderEmail({
             </p>
             
             <div style="background-color: white; border-radius: 6px; padding: 16px; border: 1px solid #e2e8f0;">
-              ${Object.entries(itemsBySupplier).map(([supplier, supplierItems]) => `
+              ${Object.entries(itemsBySupplier)
+                .map(
+                  ([supplier, supplierItems]) => `
                 <div style="margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
                   <h3 style="color: #475569; margin: 0 0 8px 0; font-size: 16px;">${supplier}</h3>
                   <ul style="margin: 0; padding-left: 20px;">
-                    ${supplierItems.map(item => `
+                    ${supplierItems
+                      .map(
+                        item => `
                       <li style="margin-bottom: 4px;">
                         <strong>${item.quantity} ${item.unit}</strong> de ${item.product}
                       </li>
-                    `).join('')}
+                    `
+                      )
+                      .join('')}
                   </ul>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
 
             <p style="margin: 24px 0 0 0; font-size: 14px; color: #64748b;">
@@ -78,12 +89,12 @@ export async function sendOrderEmail({
         </body>
       </html>
     `,
-    });
+  });
 
-    if (error) {
-        console.error('Error sending order email:', error);
-        return null;
-    }
+  if (error) {
+    console.error('Error sending order email:', error);
+    return null;
+  }
 
-    return data;
+  return data;
 }

@@ -75,6 +75,14 @@ categories[7]:
         file: 2.9-adr-008-data-scaling.toon
         title: "ADR-008: Data Scaling"
         topics[4]: scaling,archiving,indexes,performance
+      - id: arch-flows
+        file: 2.10-system-flows.toon
+        title: System Flows
+        topics[4]: order-creation,review,delivery,supplier-management
+      - id: arch-decisions
+        file: 2.11-key-decisions.toon
+        title: Key Decisions Log
+        topics[3]: tech-stack,architecture,ux
 
   - id: 03-code-standards
     name: Code Standards
@@ -205,3 +213,5 @@ quickLookup:
     scaling: arch-adr-008
     archiving: arch-adr-008
     indexes: arch-adr-008
+    flows: arch-flows
+    decisions: arch-decisions
