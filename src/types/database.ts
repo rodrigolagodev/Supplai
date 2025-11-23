@@ -465,7 +465,7 @@ export type Database = {
           id: string;
           order_id: string;
           sent_at: string | null;
-          status: string;
+          status: Database['public']['Enums']['supplier_order_status'];
           supplier_id: string;
           updated_at: string;
         };
@@ -475,7 +475,7 @@ export type Database = {
           id?: string;
           order_id: string;
           sent_at?: string | null;
-          status?: string;
+          status?: Database['public']['Enums']['supplier_order_status'];
           supplier_id: string;
           updated_at?: string;
         };
@@ -485,7 +485,7 @@ export type Database = {
           id?: string;
           order_id?: string;
           sent_at?: string | null;
-          status?: string;
+          status?: Database['public']['Enums']['supplier_order_status'];
           supplier_id?: string;
           updated_at?: string;
         };
@@ -595,6 +595,7 @@ export type Database = {
         | 'cleaning'
         | 'packaging'
         | 'other';
+      supplier_order_status: 'pending' | 'sending' | 'sent' | 'failed' | 'delivered';
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -720,7 +721,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      contact_method: ['email'],
+      contact_method: ['email', 'phone', 'whatsapp'],
       item_unit: ['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes'],
       membership_role: ['admin', 'member'],
       order_status: ['draft', 'review', 'sending', 'sent', 'archived', 'cancelled'],
@@ -732,7 +733,11 @@ export const Constants = {
         'dry_goods',
         'dairy',
         'beverages',
+        'cleaning',
+        'packaging',
+        'other',
       ],
+      supplier_order_status: ['pending', 'sending', 'sent', 'failed', 'delivered'],
     },
   },
 } as const;
