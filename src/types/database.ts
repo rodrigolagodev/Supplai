@@ -52,6 +52,53 @@ export type Database = {
           },
         ];
       };
+      jobs: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          id: string;
+          last_error: string | null;
+          max_attempts: number;
+          payload: Json;
+          status: string;
+          type: string;
+          updated_at: string;
+          user_id: string | null;
+        };
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          id?: string;
+          last_error?: string | null;
+          max_attempts?: number;
+          payload?: Json;
+          status?: string;
+          type: string;
+          updated_at?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          attempts?: number;
+          created_at?: string;
+          id?: string;
+          last_error?: string | null;
+          max_attempts?: number;
+          payload?: Json;
+          status?: string;
+          type?: string;
+          updated_at?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'jobs_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       memberships: {
         Row: {
           id: string;
@@ -536,7 +583,7 @@ export type Database = {
       contact_method: 'email' | 'phone' | 'whatsapp';
       item_unit: 'kg' | 'g' | 'units' | 'dozen' | 'liters' | 'ml' | 'packages' | 'boxes';
       membership_role: 'admin' | 'member';
-      order_status: 'draft' | 'review' | 'sent' | 'archived' | 'cancelled';
+      order_status: 'draft' | 'review' | 'sending' | 'sent' | 'archived' | 'cancelled';
       processing_status: 'pending' | 'processing' | 'completed' | 'failed';
       supplier_category:
         | 'fruits_vegetables'
@@ -676,7 +723,7 @@ export const Constants = {
       contact_method: ['email'],
       item_unit: ['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes'],
       membership_role: ['admin', 'member'],
-      order_status: ['draft', 'review', 'sent', 'archived', 'cancelled'],
+      order_status: ['draft', 'review', 'sending', 'sent', 'archived', 'cancelled'],
       processing_status: ['pending', 'processing', 'completed', 'failed'],
       supplier_category: [
         'fruits_vegetables',

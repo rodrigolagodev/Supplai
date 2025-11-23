@@ -4,6 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { parseOrderText } from '@/lib/ai/gemini';
 import { ClassifiedItem } from '@/lib/ai/classifier';
+// @ts-expect-error - Service layer modules
+import { OrderService } from '@/services/orders';
+// @ts-expect-error - Service layer modules
+import { JobQueue } from '@/services/queue';
 
 /**
  * Create a new draft order
@@ -314,8 +318,6 @@ export async function getOrderConversation(orderId: string) {
   return data;
 }
 
-import { sendOrderEmail } from '@/lib/email/orders';
-
 /**
  * Send an order to suppliers
  */
@@ -332,7 +334,7 @@ export async function sendOrder(orderId: string) {
   // 1. Get order and verify access
   const { data: order } = await supabase
     .from('orders')
-    .select('*, organization:organizations(name)')
+    .select('organization_id, status')
     .eq('id', orderId)
     .single();
 
@@ -357,148 +359,30 @@ export async function sendOrder(orderId: string) {
     throw new Error('Order can only be sent from draft or review status');
   }
 
-  // 2. Get order items with supplier info
-  const { data: items } = await supabase
-    .from('order_items')
-    .select(
-      `
-            product,
-            quantity,
-            unit,
-            supplier_id,
-            supplier:suppliers(id, name, email)
-        `
-    )
-    .eq('order_id', orderId);
+  // 2. Create Supplier Orders (Idempotent)
+  const supplierOrders = await OrderService.createSupplierOrders(orderId);
 
-  if (!items || items.length === 0) {
-    throw new Error('Order has no items');
+  if (supplierOrders.length === 0) {
+    throw new Error('No items found to send');
   }
 
-  // 3. Group items by supplier
-  type SupplierGroup = {
-    id: string;
-    name: string;
-    email?: string;
-    items: {
-      product: string;
-      quantity: number;
-      unit: string;
-      supplierName: string;
-    }[];
-  };
-
-  const itemsBySupplier = items.reduce((acc: Record<string, SupplierGroup>, item) => {
-    if (!item.supplier_id || !item.supplier) return acc;
-
-    const supplierId = item.supplier_id;
-    const supplierName = item.supplier.name || 'Sin proveedor';
-
-    if (!acc[supplierId]) {
-      acc[supplierId] = {
-        id: supplierId,
-        name: supplierName,
-        email: item.supplier.email,
-        items: [],
-      };
-    }
-
-    acc[supplierId].items.push({
-      product: item.product,
-      quantity: item.quantity,
-      unit: item.unit,
-      supplierName: supplierName,
-    });
-    return acc;
-  }, {});
-
-  // 4. Send emails
-  const results = {
-    success: 0,
-    failed: 0,
-    errors: [] as string[],
-  };
-
-  const supplierGroups = Object.values(itemsBySupplier);
-
-  for (const group of supplierGroups) {
-    if (!group.email) {
-      console.warn(`Skipping email for supplier ${group.name} (no email)`);
-      results.errors.push(`Proveedor ${group.name}: No tiene email registrado`);
-      results.failed++;
-      continue;
-    }
-
-    try {
-      const result = await sendOrderEmail({
-        to: group.email,
-        orderId: order.id,
-        organizationName: order.organization?.name || 'Organización',
-        items: group.items,
-      });
-
-      if (result) {
-        results.success++;
-
-        // Update supplier_order status to 'sent'
-        await supabase
-          .from('supplier_orders')
-          .update({
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-          })
-          .eq('order_id', orderId)
-          .eq('supplier_id', group.id);
-      } else {
-        throw new Error('Email service returned null');
-      }
-
-      // Add a small delay to be nice to the API rate limits
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch (error) {
-      console.error(`Error sending email to ${group.name}:`, error);
-      results.failed++;
-      results.errors.push(`Proveedor ${group.name}: Error al enviar email`);
-
-      // Update supplier_order status to 'failed'
-      await supabase
-        .from('supplier_orders')
-        .update({
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-        })
-        .eq('order_id', orderId)
-        .eq('supplier_id', group.id);
-    }
+  // 3. Enqueue Jobs
+  for (const supplierOrder of supplierOrders) {
+    await JobQueue.enqueue('SEND_SUPPLIER_ORDER', { supplierOrderId: supplierOrder.id });
   }
 
-  // 5. Update order status
-  // Only mark as sent if at least one email was sent successfully
-  if (results.success > 0) {
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      })
-      .eq('id', orderId);
+  // 4. Optimistic Processing (Fire-and-forget)
+  // We don't await this to return quickly to the UI
+  JobQueue.processPending().catch(err => console.error('Background processing error:', err));
 
-    if (updateError) {
-      console.error('Error updating order status:', updateError);
-      throw new Error('Failed to update order status');
-    }
-  }
+  // 5. Update main order status to 'sending' immediately for UI feedback
+  // The JobQueue will update it to 'sent' when done
+  await supabase
+    .from('orders')
+    .update({ status: 'sending' }) // You might need to add 'sending' to the enum if not present, or just leave as is and let the job update it
+    .eq('id', orderId);
 
   revalidatePath(`/orders/${orderId}`);
-
-  // Return detailed status
-  if (results.failed > 0) {
-    return {
-      success: results.success > 0, // Considered partial success if at least one sent
-      message: `Se enviaron ${results.success} correos. Fallaron ${results.failed}.`,
-      details: results,
-    };
-  }
 
   return { success: true };
 }

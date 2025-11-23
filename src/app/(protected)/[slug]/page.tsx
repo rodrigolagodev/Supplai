@@ -22,9 +22,9 @@ export async function generateMetadata({ params }: DashboardPageProps) {
   };
 }
 
-import { createClient } from '@/lib/supabase/server';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getHistoryOrders } from './history/actions';
 
 export default async function DashboardPage({ params }: DashboardPageProps) {
   const { slug } = await params;
@@ -34,13 +34,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     notFound();
   }
 
-  const supabase = await createClient();
-  const { data: recentOrders } = await supabase
-    .from('orders')
-    .select('id, created_at, status, sent_at, created_by')
-    .eq('organization_id', organization.id)
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const recentOrders = await getHistoryOrders(slug, {}, 10);
 
   return (
     <div className="space-y-6">
@@ -116,15 +110,21 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {recentOrders.map(order => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-6 hover:bg-gray-50"
-              >
+            {recentOrders.map(item => (
+              <div key={item.id} className="flex items-center justify-between p-6 hover:bg-gray-50">
                 <div className="flex flex-col space-y-1">
-                  <span className="font-medium text-gray-900">Pedido #{order.id.slice(0, 8)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {item.type === 'supplier_order' && item.supplier
+                        ? item.supplier.name
+                        : `Pedido #${item.displayId}`}
+                    </span>
+                    {item.type === 'supplier_order' && (
+                      <span className="text-xs text-gray-500">#{item.displayId}</span>
+                    )}
+                  </div>
                   <span className="text-sm text-gray-500">
-                    {formatDistanceToNow(new Date(order.created_at), {
+                    {formatDistanceToNow(new Date(item.createdAt), {
                       addSuffix: true,
                       locale: es,
                     })}
@@ -134,34 +134,40 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
                     ${
-                      order.status === 'sent'
+                      item.status === 'sent' || item.status === 'delivered'
                         ? 'bg-green-100 text-green-800'
-                        : order.status === 'draft'
+                        : item.status === 'draft'
                           ? 'bg-gray-100 text-gray-800'
-                          : order.status === 'review'
+                          : item.status === 'review'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
+                            : item.status === 'sending'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-red-100 text-red-800'
                     }`}
                   >
-                    {order.status === 'sent'
+                    {item.status === 'sent'
                       ? 'Enviado'
-                      : order.status === 'draft'
-                        ? 'Borrador'
-                        : order.status === 'review'
-                          ? 'Revisión'
-                          : order.status}
+                      : item.status === 'delivered'
+                        ? 'Entregado'
+                        : item.status === 'draft'
+                          ? 'Borrador'
+                          : item.status === 'review'
+                            ? 'Revisión'
+                            : item.status === 'sending'
+                              ? 'Enviando'
+                              : item.status}
                   </span>
                   <Button asChild variant="ghost" size="sm">
                     <Link
                       href={
-                        order.status === 'sent'
-                          ? `/orders/${order.id}/details`
-                          : order.status === 'review'
-                            ? `/orders/${order.id}/review`
-                            : `/orders/${order.id}`
+                        item.type === 'supplier_order'
+                          ? `/orders/${item.id}/details`
+                          : item.status === 'review'
+                            ? `/orders/${item.id}/review`
+                            : `/orders/${item.id}`
                       }
                     >
-                      {order.status === 'draft' ? 'Continuar' : 'Ver'}
+                      {item.status === 'draft' ? 'Continuar' : 'Ver'}
                     </Link>
                   </Button>
                 </div>

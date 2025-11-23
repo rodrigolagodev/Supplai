@@ -1,6 +1,5 @@
 'use server';
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-console */
 
 import { createClient } from '@/lib/supabase/server';
 
@@ -33,7 +32,7 @@ export type HistoryItem = {
   originalOrderId: string;
 };
 
-export async function getHistoryOrders(slug: string, filters: HistoryFilter = {}) {
+export async function getHistoryOrders(slug: string, filters: HistoryFilter = {}, limit?: number) {
   const supabase = await createClient();
 
   // 1. Get Organization ID
@@ -42,38 +41,6 @@ export async function getHistoryOrders(slug: string, filters: HistoryFilter = {}
   if (!org) throw new Error('Organization not found');
 
   const orgId = org.id;
-
-  // DEBUG: Check ALL orders in database
-  const { data: allOrdersInDb } = await supabase
-    .from('orders')
-    .select('id, status, created_at')
-    .eq('organization_id', orgId);
-
-  console.log('🗄️ ALL Orders in Database:');
-  console.log('  Total:', allOrdersInDb?.length || 0);
-  console.log(
-    '  By Status:',
-    allOrdersInDb?.reduce((acc: any, o: any) => {
-      acc[o.status] = (acc[o.status] || 0) + 1;
-      return acc;
-    }, {})
-  );
-
-  // DEBUG: Check ALL supplier_orders in database
-  const { data: allSupplierOrdersInDb } = await supabase
-    .from('supplier_orders')
-    .select('id, status, order:orders!inner(organization_id)')
-    .eq('order.organization_id', orgId);
-
-  console.log('🗄️ ALL Supplier Orders in Database:');
-  console.log('  Total:', allSupplierOrdersInDb?.length || 0);
-  console.log(
-    '  By Status:',
-    allSupplierOrdersInDb?.reduce((acc: any, so: any) => {
-      acc[so.status] = (acc[so.status] || 0) + 1;
-      return acc;
-    }, {})
-  );
 
   // Determine which types to fetch based on filters
   const supplierOrderStatuses = ['pending', 'sending', 'sent', 'failed', 'delivered'];
@@ -135,15 +102,19 @@ export async function getHistoryOrders(slug: string, filters: HistoryFilter = {}
       supplierOrdersQuery = supplierOrdersQuery.lte('created_at', filters.dateTo.toISOString());
     }
 
+    // If limit is provided and we are ONLY showing supplier orders, we can limit the query
+    // But since we might merge with order bundles, we should fetch a bit more or handle it after merge
+    // For now, let's fetch enough to cover the limit
+    if (limit && !showOrderBundles) {
+      supplierOrdersQuery = supplierOrdersQuery.limit(limit);
+    }
+
     const { data, error } = await supplierOrdersQuery;
 
     if (error) {
       console.error('Error fetching supplier orders:', error);
     } else {
       supplierOrders = data || [];
-      console.log('🔍 Supplier Orders Debug:');
-      console.log('  Count:', supplierOrders.length);
-      console.log('  Statuses:', supplierOrders.map((so: any) => so.status).join(', '));
     }
   }
 
@@ -183,24 +154,19 @@ export async function getHistoryOrders(slug: string, filters: HistoryFilter = {}
       orderBundlesQuery = orderBundlesQuery.lte('created_at', filters.dateTo.toISOString());
     }
 
+    // Same logic for limit
+    if (limit && !showSupplierOrders) {
+      orderBundlesQuery = orderBundlesQuery.limit(limit);
+    }
+
     const { data, error } = await orderBundlesQuery;
 
     if (error) {
       console.error('Error fetching order bundles:', error);
     } else {
       orderBundles = data || [];
-      console.log('📦 Order Bundles Debug:');
-      console.log('  Count:', orderBundles.length);
-      console.log('  Statuses:', orderBundles.map((o: any) => o.status).join(', '));
     }
   }
-
-  console.log('📊 Summary:');
-  console.log('  Total supplier_orders:', supplierOrders.length);
-  console.log('  Total order_bundles:', orderBundles.length);
-  console.log('  Show supplier orders:', showSupplierOrders);
-  console.log('  Show order bundles:', showOrderBundles);
-  console.log('  Applied filters:', filters);
 
   // 4. Fetch Profiles and Item Counts
   const userIds = new Set<string>();
@@ -310,9 +276,15 @@ export async function getHistoryOrders(slug: string, filters: HistoryFilter = {}
     });
   });
 
-  return historyItems.sort(
+  const sortedItems = historyItems.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+
+  if (limit) {
+    return sortedItems.slice(0, limit);
+  }
+
+  return sortedItems;
 }
 
 export async function getSuppliersForFilter(slug: string) {

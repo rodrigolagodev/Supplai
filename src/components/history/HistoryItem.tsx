@@ -41,6 +41,14 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
   };
   const StatusIcon = config.icon;
 
+  const detailsHref = (
+    item.type === 'supplier_order'
+      ? `/orders/${item.id}/details`
+      : item.status === 'review'
+        ? `/orders/${item.originalOrderId}/review`
+        : `/orders/${item.originalOrderId}`
+  ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
   return (
     <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md">
       <div
@@ -116,14 +124,13 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
             </div>
 
             <div className="flex items-end justify-end">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              <Link
-                href={
-                  `/orders/${item.type === 'supplier_order' ? item.id : item.originalOrderId}/details` as any
-                }
-              >
+              <Link href={detailsHref}>
                 <Button size="sm" className="gap-2">
-                  {item.type === 'supplier_order' ? 'Ver detalle' : 'Ver pedido completo'}
+                  {item.type === 'supplier_order'
+                    ? 'Ver detalle'
+                    : item.status === 'draft'
+                      ? 'Continuar pedido'
+                      : 'Ver pedido completo'}
                   <ExternalLink className="w-3 h-3" />
                 </Button>
               </Link>

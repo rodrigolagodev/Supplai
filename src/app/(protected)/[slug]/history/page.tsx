@@ -45,14 +45,26 @@ export default async function HistoryPage({
     // To filter by a specific DAY, we should set dateTo to end of that day.
   };
 
-  if (filters.dateFrom) {
-    const start = new Date(filters.dateFrom);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(filters.dateFrom);
-    end.setHours(23, 59, 59, 999);
+  if (resolvedSearchParams.date) {
+    const dateStr = resolvedSearchParams.date as string;
+    const parts = dateStr.split('-').map(Number);
 
-    filters.dateFrom = start;
-    filters.dateTo = end;
+    if (parts.length === 3) {
+      const year = parts[0];
+      const month = parts[1];
+      const day = parts[2];
+
+      // Construct date in local time (browser/server local)
+      // Month is 0-indexed
+      const start = new Date(year, month - 1, day);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(year, month - 1, day);
+      end.setHours(23, 59, 59, 999);
+
+      filters.dateFrom = start;
+      filters.dateTo = end;
+    }
   }
 
   // Fetch data in parallel

@@ -429,6 +429,16 @@ export async function saveOrderItems(orderId: string, items: any[]) {
     return 'units'; // Default fallback
   };
 
+  // Validate items before processing
+  for (const item of items) {
+    if (!item.quantity || item.quantity <= 0) {
+      throw new Error(`La cantidad para "${item.product}" debe ser mayor a 0`);
+    }
+    if (!item.product || item.product.trim() === '') {
+      throw new Error('El producto no puede estar vacío');
+    }
+  }
+
   // 1. Insert new items
   if (newItems.length > 0) {
     const itemsToInsert = newItems.map(item => ({

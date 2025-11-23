@@ -21,6 +21,7 @@ interface SupplierSectionProps {
     supplierId: string,
     data: { product: string; quantity: number; unit: string }
   ) => Promise<void>;
+  onDelete?: (itemId: string) => Promise<void>;
   isDroppable?: boolean;
 }
 
@@ -29,6 +30,7 @@ export function SupplierSection({
   items,
   onItemUpdate,
   onAddItem,
+  onDelete,
   isDroppable = false,
 }: SupplierSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -92,7 +94,12 @@ export function SupplierSection({
           ) : (
             <div className="space-y-2 mt-2">
               {items.map(item => (
-                <EditableItem key={item.id} item={item} onUpdate={onItemUpdate} />
+                <EditableItem
+                  key={item.id}
+                  item={item}
+                  onUpdate={onItemUpdate}
+                  onDelete={onDelete}
+                />
               ))}
             </div>
           )}

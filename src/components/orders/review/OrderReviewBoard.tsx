@@ -240,7 +240,7 @@ export function OrderReviewBoard({
 
           <div className="flex items-center gap-2">
             <Button
-              variant="destructive"
+              variant="outline"
               className="text-destructive hover:bg-destructive/10 border-destructive/50"
               onClick={() => setShowCancelConfirm(true)}
               disabled={isFinalizing || isCancelling}
@@ -328,6 +328,7 @@ export function OrderReviewBoard({
                 items={itemsBySupplier[supplier.id] || []}
                 onItemUpdate={handleUpdateItem}
                 onAddItem={handleAddItem}
+                onDelete={handleDeleteItem}
                 isDroppable={true}
               />
             ))}
