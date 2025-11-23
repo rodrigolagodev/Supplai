@@ -1,0 +1,366 @@
+plan:
+  name: Chat Architecture Refactoring
+  phase: Incremental Improvements
+  duration: 3-5 days
+  risk: low
+  impact: high
+
+currentProblems[6]{severity,issue,impact}:
+  critical,Navigation coupled to state management,SRP violation + testing difficulty
+  critical,Conversation as weak aggregate,Inconsistent state possible
+  critical,Duplicate order creation logic,DRY violation + race conditions
+  moderate,Temporal state in multiple places,Sync issues between context and hooks
+  moderate,Message ordering not guaranteed,DB order may differ from UI
+  moderate,No Command/Query separation,Complex testing + no caching
+
+proposedChanges[8]{priority,task,effort,files}:
+  high,Separate navigation from state,4h,"OrderChatContext.tsx, page components"
+  high,Centralize order creation,2h,"useOrderLifecycle.ts (new)"
+  high,Add message sequence numbers,3h,"migrations, OrderChatContext.tsx"
+  medium,Introduce Command Pattern,6h,"commands/OrderCommands.ts (new), actions.ts"
+  medium,Extract Audio Service,4h,"services/AudioService.ts (new), useAudioTranscription.ts"
+  medium,Basic Event Bus,4h,"infrastructure/EventBus.ts (new)"
+  low,Repository Pattern,8h,"repositories/IOrderRepository.ts (new)"
+  low,Basic CQRS separation,6h,"queries/OrderQueries.ts (new)"
+
+phase1_navigation:
+  title: Separate Navigation from State
+  problem: |
+    Context directly calls router.replace(), violating SRP.
+    Makes testing impossible without mocking router.
+  currentCode: |
+    const ensureOrderExists = async () => {
+      const newOrder = await createDraftOrder(organizationId);
+      setOrderId(newOrder.id);
+      setTimeout(() => router.replace(`/orders/${newOrder.id}`), 0);
+      return newOrder.id;
+    };
+  proposedCode: |
+    // OrderChatContext.tsx
+    const ensureOrderExists = async () => {
+      if (orderId) return orderId;
+      const newOrder = await createDraftOrder(organizationId);
+      setOrderId(newOrder.id);
+      onOrderCreated?.(newOrder.id); // Emit event
+      return newOrder.id;
+    };
+
+    // OrderChatPage.tsx
+    <OrderChatProvider
+      onOrderCreated={(id) => router.replace(`/orders/${id}`)}
+    />
+  benefits[3]: Testable context without router,Clear separation of concerns,Easy to add analytics/tracking
+  changes[2]{file,action}:
+    src/context/OrderChatContext.tsx,Add onOrderCreated callback prop
+    src/app/(protected)/orders/new/page.tsx,Handle onOrderCreated event
+
+phase2_orderLifecycle:
+  title: Centralize Order Creation
+  problem: |
+    Order creation logic duplicated in multiple places.
+    Race conditions possible with concurrent calls.
+  proposedCode: |
+    // hooks/useOrderLifecycle.ts
+    export function useOrderLifecycle(organizationId: string) {
+      const [orderId, setOrderId] = useState<string | null>(null);
+      const creationPromiseRef = useRef<Promise<string> | null>(null);
+
+      const ensureOrderExists = useCallback(async () => {
+        if (orderId) return orderId;
+
+        if (!creationPromiseRef.current) {
+          creationPromiseRef.current = createDraftOrder(organizationId)
+            .then(order => {
+              setOrderId(order.id);
+              creationPromiseRef.current = null;
+              return order.id;
+            });
+        }
+
+        return creationPromiseRef.current;
+      }, [orderId, organizationId]);
+
+      return { orderId, ensureOrderExists, setOrderId };
+    }
+
+    // OrderChatContext.tsx uses it
+    const { orderId, ensureOrderExists } = useOrderLifecycle(organizationId);
+  benefits[3]: Single source of truth,Prevents race conditions,Reusable across app
+  changes[2]{file,action}:
+    src/hooks/useOrderLifecycle.ts,Create new hook
+    src/context/OrderChatContext.tsx,Replace local logic with hook
+
+phase3_sequenceNumbers:
+  title: Add Message Sequence Numbers
+  problem: |
+    Messages saved async may arrive out of order in DB.
+    No way to guarantee chronological order.
+  migration: |
+    ALTER TABLE order_conversations
+    ADD COLUMN sequence_number INTEGER NOT NULL DEFAULT 0;
+
+    CREATE INDEX idx_order_conversations_sequence
+    ON order_conversations(order_id, sequence_number);
+  proposedCode: |
+    const addMessage = async (role, content, audioFileId?) => {
+      const currentOrderId = await ensureOrderExists();
+      const sequenceNumber = messages.length + 1;
+
+      const newMessage = {
+        id: crypto.randomUUID(),
+        order_id: currentOrderId,
+        role,
+        content,
+        audio_file_id: audioFileId,
+        sequence_number: sequenceNumber,
+        created_at: new Date().toISOString(),
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+      await saveConversationMessage(currentOrderId, role, content, audioFileId, sequenceNumber);
+    };
+  benefits[3]: Guaranteed order,Efficient queries with index,Audit trail capability
+  changes[3]{file,action}:
+    supabase/migrations,Add sequence_number column + index
+    src/context/OrderChatContext.tsx,Generate and save sequence numbers
+    src/app/(protected)/orders/actions.ts,Accept sequence number param
+
+phase4_commandPattern:
+  title: Introduce Command Pattern
+  problem: |
+    Server Actions mix business logic with data access.
+    Difficult to test, reuse, or track.
+  proposedStructure: |
+    src/
+    ├── application/
+    │   └── commands/
+    │       ├── OrderCommands.ts
+    │       └── MessageCommands.ts
+    └── domain/
+        └── events/
+            └── OrderEvents.ts
+  proposedCode: |
+    // application/commands/OrderCommands.ts
+    export class OrderCommands {
+      constructor(private supabase: SupabaseClient) {}
+
+      async addMessage(params: {
+        orderId: string;
+        role: 'user' | 'assistant';
+        content: string;
+        audioFileId?: string;
+        sequenceNumber: number;
+      }): Promise<string> {
+        const messageId = crypto.randomUUID();
+
+        const { error } = await this.supabase
+          .from('order_conversations')
+          .insert({
+            id: messageId,
+            order_id: params.orderId,
+            role: params.role,
+            content: params.content,
+            audio_file_id: params.audioFileId,
+            sequence_number: params.sequenceNumber,
+          });
+
+        if (error) throw new Error(`Failed to add message: ${error.message}`);
+
+        // Emit event for tracking/analytics
+        eventBus.emit('MESSAGE_ADDED', {
+          orderId: params.orderId,
+          messageId,
+          role: params.role,
+        });
+
+        return messageId;
+      }
+
+      async processOrder(orderId: string): Promise<void> {
+        const messages = await this.getConversation(orderId);
+        const items = await parseOrderText(messages);
+        await this.saveItems(orderId, items);
+
+        eventBus.emit('ORDER_PROCESSED', { orderId, itemCount: items.length });
+      }
+    }
+
+    // In Server Action
+    export async function processOrderBatch(orderId: string) {
+      const supabase = await createClient();
+      const commands = new OrderCommands(supabase);
+      await commands.processOrder(orderId);
+      return { success: true };
+    }
+  benefits[4]: Testable without DB,Reusable logic,Event tracking built-in,Clear API
+  changes[3]{file,action}:
+    src/application/commands/OrderCommands.ts,Create command class
+    src/app/(protected)/orders/actions.ts,Use commands instead of direct queries
+    src/infrastructure/eventBus/EventBus.ts,Create simple event bus
+
+phase5_audioService:
+  title: Extract Audio Service
+  problem: |
+    Audio logic tightly coupled to hook.
+    Difficult to reuse or test in isolation.
+  proposedCode: |
+    // services/AudioService.ts
+    export class AudioService {
+      constructor(
+        private supabase: SupabaseClient,
+        private transcriptionApi: ITranscriptionAPI = new GroqAPI()
+      ) {}
+
+      async uploadAndTranscribe(
+        blob: Blob,
+        orderId: string
+      ): Promise<{ transcription: string; audioFileId: string; confidence: number }> {
+        // 1. Validate
+        this.validateBlob(blob);
+
+        // 2. Check idempotency
+        const hash = await this.hashBlob(blob);
+        const existing = await this.findByHash(orderId, hash);
+        if (existing) return existing;
+
+        // 3. Upload to storage
+        const audioFileId = await this.uploadToStorage(blob, orderId);
+
+        // 4. Transcribe
+        const result = await this.transcriptionApi.transcribe(blob);
+
+        // 5. Save to DB
+        await this.saveTranscription(audioFileId, result.text, result.confidence);
+
+        return {
+          transcription: result.text,
+          audioFileId,
+          confidence: result.confidence
+        };
+      }
+
+      private async uploadToStorage(blob: Blob, orderId: string): Promise<string> {
+        const fileName = `${crypto.randomUUID()}.webm`;
+        const path = `order-audio/${orderId}/${fileName}`;
+
+        const { error } = await this.supabase.storage
+          .from('orders')
+          .upload(path, blob);
+
+        if (error) throw new AudioUploadError(error.message);
+
+        const { data: record } = await this.supabase
+          .from('order_audio_files')
+          .insert({
+            order_id: orderId,
+            storage_path: path,
+            file_size_bytes: blob.size,
+            processing_status: 'pending'
+          })
+          .select()
+          .single();
+
+        return record!.id;
+      }
+    }
+
+    // useAudioTranscription.ts now uses AudioService
+    const audioService = new AudioService(supabase);
+    const result = await audioService.uploadAndTranscribe(blob, orderId);
+  benefits[4]: Reusable across app,Easy to mock for testing,Clear error handling,Single responsibility
+  changes[3]{file,action}:
+    src/services/AudioService.ts,Create service class
+    src/hooks/useAudioTranscription.ts,Use service instead of inline logic
+    src/lib/ai/groq.ts,Extract interface ITranscriptionAPI
+
+eventBus:
+  title: Basic Event Bus Implementation
+  purpose: Enable event-driven patterns without heavy infrastructure
+  implementation: |
+    // infrastructure/eventBus/EventBus.ts
+    type EventHandler<T = any> = (data: T) => void | Promise<void>;
+
+    class EventBus {
+      private listeners = new Map<string, Set<EventHandler>>();
+
+      on<T = any>(event: string, handler: EventHandler<T>): () => void {
+        if (!this.listeners.has(event)) {
+          this.listeners.set(event, new Set());
+        }
+        this.listeners.get(event)!.add(handler);
+
+        // Return unsubscribe function
+        return () => {
+          this.listeners.get(event)?.delete(handler);
+        };
+      }
+
+      emit<T = any>(event: string, data: T): void {
+        const handlers = this.listeners.get(event);
+        if (!handlers) return;
+
+        handlers.forEach(handler => {
+          try {
+            handler(data);
+          } catch (error) {
+            console.error(`Event handler error for ${event}:`, error);
+          }
+        });
+      }
+    }
+
+    export const eventBus = new EventBus();
+  events[8]{event,data,purpose}:
+    ORDER_CREATED,"{orderId,userId}",Track order creation
+    MESSAGE_ADDED,"{orderId,messageId,role}",Analytics
+    AUDIO_UPLOADED,"{orderId,audioFileId,duration}",Monitor uploads
+    AUDIO_TRANSCRIBED,"{audioFileId,transcription,confidence}",Quality tracking
+    ORDER_PROCESSED,"{orderId,itemCount}",Conversion funnel
+    ORDER_SENT,"{orderId,supplierIds[]}",Success tracking
+    PROCESSING_FAILED,"{orderId,error}",Error monitoring
+    RATE_LIMIT_HIT,"{userId,resource}",Usage monitoring
+  usage: |
+    // In commands
+    eventBus.emit('ORDER_CREATED', { orderId, userId });
+
+    // In analytics component
+    useEffect(() => {
+      const unsubscribe = eventBus.on('ORDER_PROCESSED', (data) => {
+        trackEvent('order_processed', { itemCount: data.itemCount });
+      });
+      return unsubscribe;
+    }, []);
+  benefits[4]: Decoupled components,Easy to add analytics,Extensible,No external deps
+
+futurePhases[3]{phase,when,features}:
+  Repository Pattern,Post-MVP,Abstract data access for testing
+  Full CQRS,10+ orgs active,Separate read/write models + caching
+  Event Sourcing,Compliance needs,Complete audit trail + replay
+
+metrics[4]{category,target}:
+  Performance,Order creation < 100ms
+  Reliability,0 lost messages
+  Quality,Test coverage > 80%
+  Scalability,1000 orders/day/org
+
+implementation:
+  week1[3]{day,tasks}:
+    Mon-Tue,Navigation separation + Order lifecycle hook
+    Wed-Thu,Sequence numbers + Command Pattern
+    Fri,Audio Service extraction + tests
+  week2[2]{day,tasks}:
+    Mon-Tue,Event Bus + integrate commands
+    Wed-Fri,Testing + documentation + deploy
+  rollout:
+    strategy: Feature flags
+    steps[4]: Deploy with flags off,Enable for test org,Monitor for 24h,Enable for all
+    rollback: Toggle flag off if issues detected
+
+risks[3]{risk,mitigation}:
+  Breaking changes in context API,Feature flags + gradual rollout
+  Migration failures,Backup DB before migration + dry run
+  Performance regression,Load testing before prod deploy
+
+success:
+  criteria[5]: All tests passing,No console errors,Performance metrics met,User testing approved,Documentation updated
+  validation[3]: Manual QA on test org,Load test with 100 concurrent users,Monitor Sentry for 48h post-deploy

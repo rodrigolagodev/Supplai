@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { Database } from '@/types/database';
 import { saveConversationMessage } from '@/app/(protected)/orders/actions';
 import { toast } from 'sonner';
@@ -30,13 +29,16 @@ export function OrderChatProvider({
   orderId: initialOrderId,
   organizationId,
   initialMessages = [],
+  onOrderCreated,
+  onOrderProcessed,
 }: {
   children: React.ReactNode;
   orderId: string | null;
   organizationId: string;
   initialMessages?: Message[];
+  onOrderCreated?: (orderId: string) => void;
+  onOrderProcessed?: (redirectUrl: string) => void;
 }) {
-  const router = useRouter();
   const [orderId, setOrderId] = useState<string | null>(initialOrderId);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -53,15 +55,17 @@ export function OrderChatProvider({
     const newOrder = await createDraftOrder(organizationId);
     setOrderId(newOrder.id);
 
-    // Defer router.replace to avoid interrupting current operation
-    // Using setTimeout to ensure state update completes first
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.replace(`/orders/${newOrder.id}` as any);
-    }, 0);
+    // Notify parent component about order creation
+    // Parent will handle navigation if needed
+    if (onOrderCreated) {
+      // Defer callback to avoid interrupting current operation
+      setTimeout(() => {
+        onOrderCreated(newOrder.id);
+      }, 0);
+    }
 
     return newOrder.id;
-  }, [orderId, organizationId, router]);
+  }, [orderId, organizationId, onOrderCreated]);
 
   const addMessage = useCallback(
     async (role: 'user' | 'assistant', content: string, audioFileId?: string) => {
@@ -113,17 +117,8 @@ export function OrderChatProvider({
       setCurrentStatus('transcribing');
 
       try {
-        // Lazy order creation happens in addMessage, but we need orderId for audio upload
-        // So we need to create it here if not exists
-        let currentOrderId = orderId;
-        if (!currentOrderId) {
-          const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
-          const newOrder = await createDraftOrder(organizationId);
-          currentOrderId = newOrder.id;
-          setOrderId(currentOrderId);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          router.replace(`/orders/${currentOrderId}` as any);
-        }
+        // Ensure order exists before uploading audio
+        const currentOrderId = await ensureOrderExists();
 
         // 1. Upload and transcribe
         const formData = new FormData();
@@ -155,7 +150,7 @@ export function OrderChatProvider({
 
         const { transcription, audioFileId } = await response.json();
 
-        // 2. Add user message with audio (won't create order again since we just did)
+        // 2. Add user message with audio (won't create order again since ensureOrderExists is idempotent)
         await addMessage('user', transcription, audioFileId);
       } catch (error) {
         console.error('Audio processing error:', error);
@@ -165,7 +160,7 @@ export function OrderChatProvider({
         setCurrentStatus('idle');
       }
     },
-    [orderId, organizationId, router, addMessage]
+    [ensureOrderExists, addMessage]
   );
 
   // Process order: ensure there are user messages, lazy create order, call batch processing
@@ -177,16 +172,8 @@ export function OrderChatProvider({
       return;
     }
 
-    // Lazy order creation if needed
-    let currentOrderId = orderId;
-    if (!currentOrderId) {
-      const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
-      const newOrder = await createDraftOrder(organizationId);
-      currentOrderId = newOrder.id;
-      setOrderId(currentOrderId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.replace(`/orders/${currentOrderId}` as any);
-    }
+    // Ensure order exists
+    const currentOrderId = await ensureOrderExists();
 
     setIsProcessing(true);
     setCurrentStatus('parsing');
@@ -194,11 +181,13 @@ export function OrderChatProvider({
     try {
       const { processOrderBatch } = await import('@/app/(protected)/orders/actions');
       const result = await processOrderBatch(currentOrderId);
+
       if (result.redirectUrl) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        router.push(result.redirectUrl as any);
+        // Notify parent component to handle navigation
+        onOrderProcessed?.(result.redirectUrl);
         return;
       }
+
       if (result.message) {
         await addMessage('assistant', result.message);
       }
@@ -214,7 +203,7 @@ export function OrderChatProvider({
       setIsProcessing(false);
       setCurrentStatus('idle');
     }
-  }, [orderId, messages, organizationId, addMessage, router]);
+  }, [messages, ensureOrderExists, addMessage, onOrderProcessed]);
   return (
     <OrderChatContext.Provider
       value={{
