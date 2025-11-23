@@ -52,8 +52,14 @@ export function OrderChatProvider({
     const { createDraftOrder } = await import('@/app/(protected)/orders/actions');
     const newOrder = await createDraftOrder(organizationId);
     setOrderId(newOrder.id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    router.replace(`/orders/${newOrder.id}` as any);
+
+    // Defer router.replace to avoid interrupting current operation
+    // Using setTimeout to ensure state update completes first
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.replace(`/orders/${newOrder.id}` as any);
+    }, 0);
+
     return newOrder.id;
   }, [orderId, organizationId, router]);
 
