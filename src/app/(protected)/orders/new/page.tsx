@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
-import { OrderChatInterface } from '@/features/orders/components/OrderChatInterface';
-
 export default async function NewOrderPage() {
   const supabase = await createClient();
   const {
@@ -55,7 +53,7 @@ export default async function NewOrderPage() {
   }
 
   // EAGER ORDER CREATION: Create draft order immediately
-  // This prevents orderId state changes that cause input focus loss
+  // Then redirect to /orders/{id} to prevent draft recovery conflicts
   const { data: newOrder, error } = await supabase
     .from('orders')
     .insert({
@@ -76,14 +74,7 @@ export default async function NewOrderPage() {
     );
   }
 
-  // Always pass a real orderId (never null)
-  // This ensures orderId never changes during the conversation
-  return (
-    <OrderChatInterface
-      orderId={newOrder.id}
-      initialMessages={[]}
-      organizationSlug={membership.organization?.slug || ''}
-      organizationId={membership.organization_id}
-    />
-  );
+  // Immediately redirect to the order page
+  // This prevents conflicts with draft recovery and ensures stable URL
+  redirect(`/orders/${newOrder.id}`);
 }
