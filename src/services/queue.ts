@@ -61,7 +61,7 @@ export class JobQueue {
       .select('*')
       .eq('status', 'pending')
       .lt('attempts', 3) // Max attempts check
-      .limit(5);
+      .limit(20); // Increased from 5 to 20 for faster processing
 
     if (error || !jobs || jobs.length === 0) return;
 
@@ -85,12 +85,16 @@ export class JobQueue {
       } catch (err) {
         console.error(`Job ${job.id} failed:`, err);
 
-        // Mark as failed and increment attempts
+        const newAttempts = job.attempts + 1;
+        const hasRetriesLeft = newAttempts < 3;
+
+        // If has retries left, mark as 'pending' to retry
+        // If no retries left, mark as 'failed' permanently
         await supabase
           .from('jobs')
           .update({
-            status: 'failed', // Will be retried if attempts < max
-            attempts: job.attempts + 1,
+            status: hasRetriesLeft ? 'pending' : 'failed',
+            attempts: newAttempts,
             last_error: err instanceof Error ? err.message : 'Unknown error',
             updated_at: new Date().toISOString(),
           })

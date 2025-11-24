@@ -542,3 +542,80 @@ export async function refreshHistoryOrders(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
+
+/**
+ * Manually resend a failed supplier order
+ * Creates a new job in the queue to retry sending
+ */
+export async function resendSupplierOrder(
+  supplierOrderId: string
+): Promise<{ success: boolean; message: string }> {
+  const supabase = await createClient();
+
+  // 1. Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, message: 'No autenticado' };
+  }
+
+  // 2. Fetch supplier order to verify access
+  const { data: supplierOrder, error } = await supabase
+    .from('supplier_orders')
+    .select(
+      `
+      id,
+      status,
+      order:orders!inner(
+        id,
+        organization_id
+      )
+    `
+    )
+    .eq('id', supplierOrderId)
+    .single();
+
+  if (error || !supplierOrder) {
+    return { success: false, message: 'Pedido no encontrado' };
+  }
+
+  // 3. Verify user belongs to organization
+  const { data: membership } = await supabase
+    .from('memberships')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('organization_id', (supplierOrder.order as any).organization_id)
+    .single();
+
+  if (!membership) {
+    return { success: false, message: 'No tienes permiso para reenviar este pedido' };
+  }
+
+  // 4. Reset supplier_order status to pending
+  const { error: updateError } = await supabase
+    .from('supplier_orders')
+    .update({
+      status: 'pending',
+      error_message: null,
+    })
+    .eq('id', supplierOrderId);
+
+  if (updateError) {
+    return { success: false, message: 'Error al actualizar estado del pedido' };
+  }
+
+  // 5. Create a new job in the queue
+  const { error: jobError } = await supabase.from('jobs').insert({
+    type: 'SEND_SUPPLIER_ORDER',
+    payload: { supplierOrderId },
+    status: 'pending',
+    attempts: 0,
+  });
+
+  if (jobError) {
+    return { success: false, message: 'Error al encolar trabajo de reenvío' };
+  }
+
+  return { success: true, message: 'Pedido reencolado para reenvío' };
+}

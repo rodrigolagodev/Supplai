@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { HistoryItem as HistoryItemType } from '@/app/(protected)/[slug]/history/actions';
+import {
+  HistoryItem as HistoryItemType,
+  resendSupplierOrder,
+} from '@/app/(protected)/[slug]/history/actions';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -14,10 +17,12 @@ import {
   AlertCircle,
   User,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 import { LucideIcon } from 'lucide-react';
 
@@ -33,6 +38,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: LucideI
 
 export function HistoryItem({ item }: { item: HistoryItemType }) {
   const [expanded, setExpanded] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const config = statusConfig[item.status] || {
     label: item.status,
@@ -40,6 +46,26 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
     icon: Package,
   };
   const StatusIcon = config.icon;
+
+  const handleResend = async () => {
+    if (item.type !== 'supplier_order') return;
+
+    setIsResending(true);
+    try {
+      const result = await resendSupplierOrder(item.id);
+
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Error resending order:', error);
+      toast.error('Error al reenviar pedido');
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const detailsHref = (
     item.type === 'supplier_order'
@@ -123,7 +149,28 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
               </div>
             </div>
 
-            <div className="flex items-end justify-end">
+            <div className="flex items-end justify-end gap-2">
+              {item.type === 'supplier_order' && item.status === 'failed' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleResend}
+                  disabled={isResending}
+                >
+                  {isResending ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Reenviando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3 h-3" />
+                      Reenviar
+                    </>
+                  )}
+                </Button>
+              )}
               <Link href={detailsHref}>
                 <Button size="sm" className="gap-2">
                   {item.type === 'supplier_order'
