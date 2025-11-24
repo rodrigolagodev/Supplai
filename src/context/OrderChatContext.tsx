@@ -16,7 +16,12 @@ interface OrderChatContextType {
   isProcessing: boolean;
   currentStatus: string; // 'listening' | 'transcribing' | 'parsing' | 'classifying' | 'idle'
   ensureOrderExists: () => Promise<string>;
-  addMessage: (role: 'user' | 'assistant', content: string, audioFileId?: string) => Promise<void>;
+  addMessage: (
+    role: 'user' | 'assistant',
+    content: string,
+    audioFileId?: string,
+    existingOrderId?: string
+  ) => Promise<void>;
   processAudio: (audioBlob: Blob) => Promise<void>;
   processTranscription: (result: { transcription: string; audioFileId: string }) => Promise<void>;
   processText: (text: string) => Promise<void>;
@@ -80,9 +85,23 @@ export function OrderChatProvider({
   }, [ensureOrderExistsInternal]);
 
   const addMessage = useCallback(
-    async (role: 'user' | 'assistant', content: string, audioFileId?: string) => {
-      // Ensure order exists
-      const { orderId: currentOrderId, wasCreated } = await ensureOrderExistsInternal();
+    async (
+      role: 'user' | 'assistant',
+      content: string,
+      audioFileId?: string,
+      existingOrderId?: string
+    ) => {
+      let currentOrderId: string;
+      let wasCreated = false;
+
+      // Use provided orderId or ensure one exists
+      if (existingOrderId) {
+        currentOrderId = existingOrderId;
+      } else {
+        const result = await ensureOrderExistsInternal();
+        currentOrderId = result.orderId;
+        wasCreated = result.wasCreated;
+      }
 
       // Generate sequence number based on current message count
       // This ensures chronological ordering even if created_at has clock skew
@@ -175,8 +194,9 @@ export function OrderChatProvider({
 
         const { transcription, audioFileId } = await response.json();
 
-        // 2. Add user message with audio (won't create order again since ensureOrderExists is idempotent)
-        await addMessage('user', transcription, audioFileId);
+        // 2. Add user message with audio
+        // Pass currentOrderId to prevent race condition (creating duplicate orders)
+        await addMessage('user', transcription, audioFileId, currentOrderId);
       } catch (error) {
         console.error('Audio processing error:', error);
         toast.error('Error al procesar el audio');
