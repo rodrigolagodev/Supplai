@@ -46,30 +46,37 @@ export function OrderChatProvider({
       // orderId is always available (eager creation)
       // No lazy creation or state changes needed
 
-      // Generate sequence number based on current message count
-      // This ensures chronological ordering even if created_at has clock skew
-      const sequenceNumber = messages.length + 1;
-
       const tempId = crypto.randomUUID();
-      const newMessage: Message = {
-        id: tempId,
-        order_id: orderId,
-        role,
-        content,
-        audio_file_id: audioFileId || null,
-        created_at: new Date().toISOString(),
-      };
+      let sequenceNumber: number;
 
-      setMessages(prev => [...prev, newMessage]);
+      // Use functional update to avoid race conditions
+      // Calculate sequence number based on ACTUAL current state, not closure
+      setMessages(prev => {
+        // Generate sequence number based on current message count
+        // This ensures chronological ordering even if created_at has clock skew
+        sequenceNumber = prev.length + 1;
+
+        const newMessage: Message = {
+          id: tempId,
+          order_id: orderId,
+          role,
+          content,
+          audio_file_id: audioFileId || null,
+          created_at: new Date().toISOString(),
+        };
+
+        return [...prev, newMessage];
+      });
 
       try {
-        await saveConversationMessage(orderId, role, content, audioFileId, sequenceNumber);
+        // sequenceNumber is guaranteed to be set from setMessages above
+        await saveConversationMessage(orderId, role, content, audioFileId, sequenceNumber!);
       } catch (error) {
         console.error('Failed to save message:', error);
         toast.error('Error al guardar el mensaje');
       }
     },
-    [orderId, messages.length]
+    [orderId]
   );
 
   const processText = useCallback(
