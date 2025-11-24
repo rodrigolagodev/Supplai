@@ -4,25 +4,32 @@ import { JobQueue } from '@/services/queue';
 
 /**
  * API Route para procesar jobs pendientes
- * Diseñado para ser llamado por un cron job externo (GitHub Actions, Vercel Cron, etc.)
+ * Diseñado para ser llamado por Vercel Cron o cron jobs externos
  *
  * Seguridad:
- * - Requiere CRON_SECRET en header Authorization
+ * - Vercel Cron: Verifica header 'x-vercel-cron-id' (enviado automáticamente)
+ * - Llamadas manuales: Requiere CRON_SECRET en header Authorization
  * - Usa Service Role Key para bypasear RLS y procesar todos los jobs
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verificar autorización con CRON_SECRET
+    // Verificar autorización
+    // Vercel Cron envía header 'x-vercel-cron-id' automáticamente
+    // Para llamadas manuales, acepta CRON_SECRET
+    const vercelCronId = request.headers.get('x-vercel-cron-id');
     const authHeader = request.headers.get('Authorization');
-    const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
+    const expectedAuth = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : null;
 
-    if (!process.env.CRON_SECRET) {
-      console.error('CRON_SECRET not configured');
-      return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
-    }
+    // Permitir si es Vercel Cron o si tiene CRON_SECRET válido
+    const isVercelCron = !!vercelCronId;
+    const hasValidSecret = expectedAuth && authHeader === expectedAuth;
 
-    if (authHeader !== expectedAuth) {
-      console.warn('Unauthorized cron job attempt');
+    if (!isVercelCron && !hasValidSecret) {
+      console.warn('Unauthorized cron job attempt', {
+        hasVercelCronId: !!vercelCronId,
+        hasAuthHeader: !!authHeader,
+        hasCronSecret: !!process.env.CRON_SECRET,
+      });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
