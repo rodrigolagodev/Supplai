@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { transcribeAudio } from '@/lib/ai/groq';
+import { AudioService, GroqTranscriptionAPI } from '@/application/services/audio';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,106 +44,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // 2. Upload to Supabase Storage
-    const fileExt = audioFile.name.split('.').pop() || 'webm';
-    const fileName = `${crypto.randomUUID()}.${fileExt}`;
-    const storagePath = `order-audio/${orderId}/${fileName}`;
+    // 2. Convert File to Blob and process with AudioService
+    const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: audioFile.type });
 
-    // Use Admin Client to ensure bucket exists (only if key is available)
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const adminClient = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY
-      );
+    const transcriptionAPI = new GroqTranscriptionAPI();
+    const audioService = new AudioService(supabase, transcriptionAPI);
 
-      const { data: buckets } = await adminClient.storage.listBuckets();
-      if (!buckets?.find(b => b.name === 'orders')) {
-        await adminClient.storage.createBucket('orders', {
-          public: false,
-          fileSizeLimit: 26214400, // 25MB
-        });
-      }
-    }
-
-    // Upload using authenticated user client (respects RLS)
-    const { error: uploadError } = await supabase.storage
-      .from('orders')
-      .upload(storagePath, audioFile, {
-        contentType: 'audio/webm',
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return NextResponse.json({ error: 'Failed to upload audio' }, { status: 500 });
-    }
-
-    /* console.log('Audio file details:', {
-      name: audioFile.name,
-      type: audioFile.type,
-      size: audioFile.size,
-    }); */
-
-    // 3. Create database record for audio file
-    const { data: audioRecord, error: dbError } = await supabase
-      .from('order_audio_files')
-      .insert({
-        order_id: orderId,
-        storage_path: storagePath,
-        file_size_bytes: audioFile.size,
-        processing_status: 'pending',
-      })
-      .select()
-      .single();
-
-    if (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: `Failed to create audio record: ${dbError.message} (${dbError.details || ''})` },
-        { status: 500 }
-      );
-    }
-
-    // 4. Transcribe with Groq
-    // Note: In a production app, this might be better as a background job
-    // But for MVP/interactive chat, we do it inline for speed
     try {
-      const result = await transcribeAudio(audioFile);
-
-      // Update record with result
-      await supabase
-        .from('order_audio_files')
-        .update({
-          transcription: result.text,
-          confidence_score: result.confidence,
-          duration_seconds: result.duration,
-          processing_status: 'completed',
-          transcribed_at: new Date().toISOString(),
-        })
-        .eq('id', audioRecord.id);
+      const result = await audioService.uploadAndTranscribe(audioBlob, orderId);
 
       return NextResponse.json({
-        transcription: result.text,
-        confidence: result.confidence,
-        audioFileId: audioRecord.id,
+        transcription: result.transcription,
+        audioFileId: result.audioFileId,
+        fromCache: result.fromCache,
       });
-    } catch (transcriptionError) {
-      console.error('Transcription error:', transcriptionError);
-
-      // Update record with error
-      await supabase
-        .from('order_audio_files')
-        .update({
-          processing_status: 'failed',
-          error_message: (transcriptionError as Error).message,
-        })
-        .eq('id', audioRecord.id);
-
-      return NextResponse.json(
-        { error: `Transcription failed: ${(transcriptionError as Error).message}` },
-        { status: 500 }
-      );
+    } catch (serviceError) {
+      console.error('Audio service error:', serviceError);
+      return NextResponse.json({ error: (serviceError as Error).message }, { status: 500 });
     }
   } catch (error) {
     console.error('API error:', error);
