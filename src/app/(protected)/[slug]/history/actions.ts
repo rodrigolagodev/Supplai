@@ -322,3 +322,223 @@ export async function getMembersForFilter(slug: string) {
 
   return profiles || [];
 }
+
+/**
+ * Client-side action to refresh orders with current filters
+ * Used by useRealtimeOrders hook when realtime events occur
+ */
+export async function refreshHistoryOrders(
+  organizationId: string,
+  filters: HistoryFilter = {}
+): Promise<HistoryItem[]> {
+  const supabase = await createClient();
+
+  // Similar logic to getHistoryOrders but using organizationId directly
+  const supplierOrderStatuses = ['pending', 'sending', 'sent', 'failed', 'delivered'];
+  const orderBundleStatuses = ['draft', 'review'];
+
+  let showSupplierOrders = true;
+  let showOrderBundles = true;
+
+  if (filters.status && filters.status.length > 0) {
+    const hasSupplierOrderStatus = filters.status.some(s => supplierOrderStatuses.includes(s));
+    const hasOrderBundleStatus = filters.status.some(s => orderBundleStatuses.includes(s));
+
+    showSupplierOrders = hasSupplierOrderStatus;
+    showOrderBundles = hasOrderBundleStatus;
+  }
+
+  // Fetch Supplier Orders
+  let supplierOrders: any[] = [];
+
+  if (showSupplierOrders) {
+    let supplierOrdersQuery = supabase
+      .from('supplier_orders')
+      .select(
+        `
+        id,
+        status,
+        created_at,
+        sent_at,
+        supplier_id,
+        supplier:suppliers!inner(id, name),
+        order:orders!inner(
+          id,
+          organization_id,
+          created_by
+        )
+      `
+      )
+      .eq('order.organization_id', organizationId)
+      .order('created_at', { ascending: false });
+
+    if (filters.status && filters.status.length > 0) {
+      const relevantStatuses = filters.status.filter(s => supplierOrderStatuses.includes(s));
+      if (relevantStatuses.length > 0) {
+        supplierOrdersQuery = supplierOrdersQuery.in('status', relevantStatuses as any);
+      }
+    }
+    if (filters.supplierId) {
+      supplierOrdersQuery = supplierOrdersQuery.eq('supplier_id', filters.supplierId);
+    }
+    if (filters.memberId) {
+      supplierOrdersQuery = supplierOrdersQuery.eq('order.created_by', filters.memberId);
+    }
+    if (filters.dateFrom) {
+      supplierOrdersQuery = supplierOrdersQuery.gte('created_at', filters.dateFrom.toISOString());
+    }
+    if (filters.dateTo) {
+      supplierOrdersQuery = supplierOrdersQuery.lte('created_at', filters.dateTo.toISOString());
+    }
+
+    const { data } = await supplierOrdersQuery;
+    supplierOrders = data || [];
+  }
+
+  // Fetch Order Bundles
+  let orderBundles: any[] = [];
+
+  if (showOrderBundles) {
+    let orderBundlesQuery = supabase
+      .from('orders')
+      .select(
+        `
+        id,
+        status,
+        created_at,
+        sent_at,
+        created_by
+      `
+      )
+      .eq('organization_id', organizationId)
+      .in('status', ['draft', 'review'])
+      .order('created_at', { ascending: false });
+
+    if (filters.status && filters.status.length > 0) {
+      const relevantStatuses = filters.status.filter(s => orderBundleStatuses.includes(s));
+      if (relevantStatuses.length > 0) {
+        orderBundlesQuery = orderBundlesQuery.in('status', relevantStatuses as any);
+      }
+    }
+    if (filters.memberId) {
+      orderBundlesQuery = orderBundlesQuery.eq('created_by', filters.memberId);
+    }
+    if (filters.dateFrom) {
+      orderBundlesQuery = orderBundlesQuery.gte('created_at', filters.dateFrom.toISOString());
+    }
+    if (filters.dateTo) {
+      orderBundlesQuery = orderBundlesQuery.lte('created_at', filters.dateTo.toISOString());
+    }
+
+    const { data } = await orderBundlesQuery;
+    orderBundles = data || [];
+  }
+
+  // Fetch Profiles and Item Counts
+  const userIds = new Set<string>();
+  const orderIds = new Set<string>();
+
+  supplierOrders.forEach((so: any) => {
+    userIds.add(so.order.created_by);
+    orderIds.add(so.order.id);
+  });
+  orderBundles.forEach((order: any) => {
+    userIds.add(order.created_by);
+    orderIds.add(order.id);
+  });
+
+  const profilesMap: Record<string, any> = {};
+  if (userIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', Array.from(userIds));
+
+    if (profiles) {
+      profiles.forEach(p => {
+        profilesMap[p.id] = p;
+      });
+    }
+  }
+
+  const itemCounts: Record<string, { total: number; bySupplier: Record<string, number> }> = {};
+  if (orderIds.size > 0) {
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('order_id, supplier_id')
+      .in('order_id', Array.from(orderIds));
+
+    if (items) {
+      items.forEach((item: any) => {
+        if (!itemCounts[item.order_id]) {
+          itemCounts[item.order_id] = { total: 0, bySupplier: {} };
+        }
+        itemCounts[item.order_id]!.total++;
+
+        if (item.supplier_id) {
+          if (!itemCounts[item.order_id]!.bySupplier[item.supplier_id]) {
+            itemCounts[item.order_id]!.bySupplier[item.supplier_id] = 0;
+          }
+          itemCounts[item.order_id]!.bySupplier[item.supplier_id]!++;
+        }
+      });
+    }
+  }
+
+  // Transform and Merge
+  const historyItems: HistoryItem[] = [];
+
+  supplierOrders.forEach((so: any) => {
+    const profile = profilesMap[so.order.created_by] || {};
+    const name = profile.full_name || 'Unknown';
+    const avatar = profile.avatar_url || null;
+
+    const count = itemCounts[so.order.id]?.bySupplier[so.supplier_id] || 0;
+
+    historyItems.push({
+      id: so.id,
+      type: 'supplier_order',
+      displayId: so.order.id.slice(0, 8),
+      status: so.status,
+      createdAt: so.created_at,
+      sentAt: so.sent_at,
+      supplier: so.supplier,
+      totalItems: count,
+      createdBy: {
+        name,
+        email: '',
+        avatarUrl: avatar,
+      },
+      originalOrderId: so.order.id,
+    });
+  });
+
+  orderBundles.forEach((order: any) => {
+    const profile = profilesMap[order.created_by] || {};
+    const name = profile.full_name || 'Unknown';
+    const avatar = profile.avatar_url || null;
+
+    const count = itemCounts[order.id]?.total || 0;
+
+    historyItems.push({
+      id: order.id,
+      type: 'order_bundle',
+      displayId: order.id.slice(0, 8),
+      status: order.status,
+      createdAt: order.created_at,
+      sentAt: order.sent_at,
+      supplier: null,
+      totalItems: count,
+      createdBy: {
+        name,
+        email: '',
+        avatarUrl: avatar,
+      },
+      originalOrderId: order.id,
+    });
+  });
+
+  return historyItems.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}

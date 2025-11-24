@@ -5,9 +5,10 @@ import {
   getMembersForFilter,
   HistoryFilter,
 } from './actions';
-import { HistoryList } from '@/components/history/HistoryList';
+import { HistoryListContainer } from '@/components/history/HistoryListContainer';
 import { HistoryFilters } from '@/components/history/HistoryFilters';
 import { Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
   title: 'Historial de Pedidos',
@@ -77,6 +78,20 @@ export default async function HistoryPage({
     }
   }
 
+  // Get organization ID for realtime subscriptions
+  const supabase = await createClient();
+  const { data: org } = await supabase.from('organizations').select('id').eq('slug', slug).single();
+
+  if (!org) {
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-5xl">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-red-500">Organización no encontrada</h2>
+        </div>
+      </div>
+    );
+  }
+
   // Fetch data in parallel
   const [orders, suppliers, members] = await Promise.all([
     getHistoryOrders(slug, filters),
@@ -100,7 +115,7 @@ export default async function HistoryPage({
           </div>
         }
       >
-        <HistoryList items={orders} />
+        <HistoryListContainer initialOrders={orders} organizationId={org.id} filters={filters} />
       </Suspense>
     </div>
   );
