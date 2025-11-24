@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { Database } from '@/types/database';
 import { saveConversationMessage } from '@/app/(protected)/orders/actions';
 import { toast } from 'sonner';
@@ -261,24 +261,37 @@ export function OrderChatProvider({
       setCurrentStatus('idle');
     }
   }, [messages, ensureOrderExists, addMessage, onOrderProcessed]);
-  return (
-    <OrderChatContext.Provider
-      value={{
-        orderId,
-        messages,
-        isProcessing,
-        currentStatus,
-        ensureOrderExists,
-        addMessage,
-        processAudio,
-        processTranscription,
-        processText,
-        processOrder,
-      }}
-    >
-      {children}
-    </OrderChatContext.Provider>
+
+  // Memoize context value to prevent unnecessary re-renders in child components
+  // Only re-create when actual dependencies change
+  const contextValue = useMemo(
+    () => ({
+      orderId,
+      messages,
+      isProcessing,
+      currentStatus,
+      ensureOrderExists,
+      addMessage,
+      processAudio,
+      processTranscription,
+      processText,
+      processOrder,
+    }),
+    [
+      orderId,
+      messages,
+      isProcessing,
+      currentStatus,
+      ensureOrderExists,
+      addMessage,
+      processAudio,
+      processTranscription,
+      processText,
+      processOrder,
+    ]
   );
+
+  return <OrderChatContext.Provider value={contextValue}>{children}</OrderChatContext.Provider>;
 }
 
 export function useOrderChat() {

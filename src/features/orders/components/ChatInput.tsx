@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { useOrderChat } from '@/context/OrderChatContext';
 import { VoiceRecorderButton } from './VoiceRecorderButton';
 import { Button } from '@/components/ui/button';
 import { SendHorizontal } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
-export function ChatInput() {
+/**
+ * ChatInput component with React.memo to prevent unnecessary re-renders
+ * when orderId changes in the context (which doesn't affect this component's UI)
+ */
+export const ChatInput = memo(function ChatInput() {
   const { processText, processTranscription, isProcessing, orderId, ensureOrderExists } =
     useOrderChat();
   const [input, setInput] = useState('');
@@ -84,4 +88,4 @@ export function ChatInput() {
       </div>
     </div>
   );
-}
+});
