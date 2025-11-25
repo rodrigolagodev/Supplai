@@ -1,6 +1,7 @@
 'use server';
 
-import { getAuthedContext, getOrderContext } from '@/lib/auth/context';
+import { getOrderContext } from '@/lib/auth/context';
+import { createClient } from '@/lib/supabase/server';
 import { ClassifiedItem } from '@/lib/ai/classifier';
 import { revalidatePath } from 'next/cache';
 import type { Database } from '@/types/database';
@@ -43,7 +44,19 @@ export async function updateOrderItem(
     unit?: Database['public']['Enums']['item_unit'];
   }
 ) {
-  const { supabase } = await getAuthedContext();
+  // First get the item to extract order_id
+  const supabaseTemp = await createClient();
+  const { data: item } = await supabaseTemp
+    .from('order_items')
+    .select('order_id')
+    .eq('id', itemId)
+    .single();
+
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  const { supabase } = await getOrderContext(item.order_id);
 
   // Update item
   const { error } = await supabase.from('order_items').update(data).eq('id', itemId);
@@ -59,7 +72,19 @@ export async function updateOrderItem(
  * Reassign item to a different supplier
  */
 export async function reassignItem(itemId: string, supplierId: string | null) {
-  const { supabase } = await getAuthedContext();
+  // First get the item to extract order_id
+  const supabaseTemp = await createClient();
+  const { data: item } = await supabaseTemp
+    .from('order_items')
+    .select('order_id')
+    .eq('id', itemId)
+    .single();
+
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  const { supabase } = await getOrderContext(item.order_id);
 
   // Update supplier_id
   const { error } = await supabase
@@ -77,15 +102,8 @@ export async function reassignItem(itemId: string, supplierId: string | null) {
   }
 
   // Revalidate
-  const { data: item } = await supabase
-    .from('order_items')
-    .select('order_id')
-    .eq('id', itemId)
-    .single();
-
-  if (item) {
-    revalidatePath(`/orders/${item.order_id}/review`);
-  }
+  revalidatePath(`/orders/${item.order_id}`);
+  revalidatePath(`/orders/${item.order_id}/review`);
 
   return { success: true };
 }
@@ -94,14 +112,19 @@ export async function reassignItem(itemId: string, supplierId: string | null) {
  * Delete an unclassified order item
  */
 export async function deleteOrderItem(itemId: string) {
-  const { supabase } = await getAuthedContext();
-
-  // Get order_id first for revalidation
-  const { data: item } = await supabase
+  // First get the item to extract order_id
+  const supabaseTemp = await createClient();
+  const { data: item } = await supabaseTemp
     .from('order_items')
     .select('order_id')
     .eq('id', itemId)
     .single();
+
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  const { supabase } = await getOrderContext(item.order_id);
 
   // Delete item
   const { error } = await supabase.from('order_items').delete().eq('id', itemId);
@@ -121,7 +144,7 @@ export async function deleteOrderItem(itemId: string) {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function saveOrderItems(orderId: string, items: any[]) {
-  const { supabase } = await getAuthedContext();
+  const { supabase } = await getOrderContext(orderId);
 
   // Separate new items from existing items
   const newItems = items.filter(item => item.id.toString().startsWith('temp'));
@@ -203,7 +226,7 @@ export async function createOrderItem(
   supplierId: string,
   data: { product: string; quantity: number; unit: string }
 ) {
-  const { supabase } = await getAuthedContext();
+  const { supabase } = await getOrderContext(orderId);
 
   const { data: newItem, error } = await supabase
     .from('order_items')

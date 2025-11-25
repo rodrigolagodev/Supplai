@@ -1,11 +1,11 @@
 'use server';
 
-import { getAuthedContext } from '@/lib/auth/context';
+import { getOrderContext } from '@/lib/auth/context';
 import { revalidatePath } from 'next/cache';
 import type { Database } from '@/types/database';
 
 export async function cancelOrder(orderId: string) {
-  const { supabase } = await getAuthedContext();
+  const { supabase } = await getOrderContext(orderId);
 
   const { error } = await supabase
     .from('orders')
