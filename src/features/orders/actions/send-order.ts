@@ -1,6 +1,6 @@
 'use server';
 
-import { getAuthedContext, getOrderContext } from '@/lib/auth/context';
+import { getOrderContext } from '@/lib/auth/context';
 import { revalidatePath } from 'next/cache';
 import { saveOrderItems } from '@/features/orders/actions/items';
 
@@ -31,7 +31,8 @@ export async function sendOrder(orderId: string) {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function finalizeOrder(orderId: string, items: any[]) {
-  await getAuthedContext(); // Just check auth first
+  // Verify access to order first
+  await getOrderContext(orderId);
 
   // First save all items
   await saveOrderItems(orderId, items);
