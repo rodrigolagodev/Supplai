@@ -1,4 +1,4 @@
-import { getOrderDetails } from '../../actions';
+import { getOrderDetails } from '@/features/orders/queries/get-order';
 import { ReadOnlyOrderView } from '@/features/orders/components/review/ReadOnlyOrderView';
 import { redirect, notFound } from 'next/navigation';
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { AudioService, GroqTranscriptionAPI } from '@/application/services/audio';
+import { AudioService } from '@/features/orders/server/services/audio-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,8 +47,7 @@ export async function POST(request: NextRequest) {
     // 2. Convert File to Blob and process with AudioService
     const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: audioFile.type });
 
-    const transcriptionAPI = new GroqTranscriptionAPI();
-    const audioService = new AudioService(supabase, transcriptionAPI);
+    const audioService = new AudioService(supabase);
 
     try {
       const result = await audioService.uploadAndTranscribe(audioBlob, orderId);
@@ -60,7 +59,9 @@ export async function POST(request: NextRequest) {
       });
     } catch (serviceError) {
       console.error('Audio service error:', serviceError);
-      return NextResponse.json({ error: (serviceError as Error).message }, { status: 500 });
+      const errorMessage = serviceError instanceof Error ? serviceError.message : 'Unknown error';
+      console.error('Error details:', { errorMessage, stack: (serviceError as Error).stack });
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
   } catch (error) {
     console.error('API error:', error);

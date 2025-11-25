@@ -5,8 +5,8 @@ import {
   getMembersForFilter,
   HistoryFilter,
 } from './actions';
-import { HistoryListContainer } from '@/components/history/HistoryListContainer';
-import { HistoryFilters } from '@/components/history/HistoryFilters';
+import { HistoryListContainer } from '@/features/history/components/HistoryListContainer';
+import { HistoryFilters } from '@/features/history/components/HistoryFilters';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 

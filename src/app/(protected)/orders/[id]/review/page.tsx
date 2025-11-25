@@ -1,4 +1,4 @@
-import { getOrderReview } from '../../actions';
+import { getOrderReview } from '@/features/orders/queries/get-order';
 import { OrderReviewClient } from '@/features/orders/components/review/OrderReviewClient';
 import { redirect } from 'next/navigation';
 

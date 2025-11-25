@@ -1,7 +1,7 @@
 import { google } from '@ai-sdk/google';
-import { streamText } from 'ai';
+import { streamText, CoreMessage } from 'ai';
 import { createClient } from '@/lib/supabase/server';
-import { saveConversationMessage } from '@/app/(protected)/orders/actions';
+import { saveConversationMessage } from '@/features/orders/actions/process-message';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -55,8 +55,7 @@ export async function POST(req: Request) {
     return new Response('Invalid messages format', { status: 400 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lastMessage = messages[messages.length - 1] as any;
+  const lastMessage = messages[messages.length - 1] as CoreMessage | undefined;
 
   // Get the current max sequence number for proper ordering
   const { data: maxSeqData } = await supabase
@@ -67,13 +66,24 @@ export async function POST(req: Request) {
     .limit(1)
     .maybeSingle();
 
-  const nextSeq = (maxSeqData?.sequence_number ?? -1) + 1;
+  const nextSeq = ((maxSeqData as { sequence_number?: number })?.sequence_number ?? -1) + 1;
 
   // 1. Save User Message IMMEDIATELY (to prevent loss on abort)
-  if (lastMessage && lastMessage.role === 'user') {
+  if (
+    lastMessage &&
+    'role' in lastMessage &&
+    lastMessage.role === 'user' &&
+    'content' in lastMessage
+  ) {
     try {
       console.log('[API] Saving user message with seq:', nextSeq);
-      await saveConversationMessage(orderId, 'user', lastMessage.content, undefined, nextSeq);
+      await saveConversationMessage(
+        orderId,
+        'user',
+        String(lastMessage.content),
+        undefined,
+        nextSeq
+      );
     } catch (error) {
       console.error('Failed to save user message:', error);
       // We continue even if saving fails, but ideally we should alert
@@ -82,10 +92,8 @@ export async function POST(req: Request) {
 
   const result = await streamText({
     model: google('gemini-1.5-flash'),
-    messages: messages.map((m: { role: string; content: string }) => ({
-      role: m.role,
-      content: m.content,
-    })),
+
+    messages: messages as CoreMessage[],
     system: `Eres un asistente de pedidos para restaurantes. 
     Tu objetivo es ayudar al usuario a crear una lista de productos para pedir a sus proveedores.
     Sé conciso y directo. Si el usuario pide algo, confirma que lo has anotado.

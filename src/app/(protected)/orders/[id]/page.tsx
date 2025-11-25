@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect, notFound } from 'next/navigation';
 import { OrderChatInterface } from '@/features/orders/components/OrderChatInterface';
-import { getOrderConversation } from '../actions';
+import { getOrderConversation } from '@/features/orders/queries/get-order';
 
 interface PageProps {
   params: Promise<{

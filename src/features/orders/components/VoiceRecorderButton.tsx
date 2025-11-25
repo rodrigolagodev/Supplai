@@ -4,17 +4,16 @@ import { useAudioTranscription } from '@/hooks/useAudioTranscription';
 import { Mic, Square, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { TranscriptionResult } from '@/types/audio';
 
 interface VoiceRecorderButtonProps {
   orderId: string;
-  onTranscriptionSuccess: (result: TranscriptionResult) => void;
+  onRecordingComplete: (audioBlob: Blob) => void;
   disabled?: boolean;
 }
 
 export function VoiceRecorderButton({
   orderId,
-  onTranscriptionSuccess,
+  onRecordingComplete,
   disabled = false,
 }: VoiceRecorderButtonProps) {
   const {
@@ -28,9 +27,13 @@ export function VoiceRecorderButton({
     canRetry,
   } = useAudioTranscription({
     orderId,
-    onSuccess: onTranscriptionSuccess,
+    autoTranscribe: false, // Modo local-first: solo grabar, no transcribir
+    onRecordingComplete: blob => {
+      // Pasar el blob al componente padre para procesamiento local-first
+      onRecordingComplete(blob);
+    },
     onError: error => {
-      console.error('Audio transcription error:', error);
+      console.error('Audio recording error:', error);
     },
   });
 

@@ -3,7 +3,9 @@
 import React, { useEffect, useRef } from 'react';
 import { useOrderChat } from '@/context/OrderChatContext';
 import { cn } from '@/lib/utils';
-import { Bot, User } from 'lucide-react';
+import { Bot, User, CheckCheck, Clock } from 'lucide-react';
+import { AudioMessage } from './AudioMessage';
+import { LocalMessage } from '@/lib/db/schema';
 
 export function MessageList() {
   const { messages, isLoading, currentStatus } = useOrderChat();
@@ -28,41 +30,7 @@ export function MessageList() {
       )}
 
       {messages.map(msg => (
-        <div
-          key={msg.id}
-          className={cn(
-            'flex w-full gap-3 max-w-3xl mx-auto',
-            msg.role === 'user' ? 'justify-end' : 'justify-start'
-          )}
-        >
-          {msg.role === 'assistant' && (
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Bot className="h-5 w-5 text-primary" />
-            </div>
-          )}
-
-          <div
-            className={cn(
-              'rounded-2xl px-4 py-3 max-w-[80%]',
-              msg.role === 'user'
-                ? 'bg-primary text-primary-foreground rounded-br-none'
-                : 'bg-muted text-foreground rounded-bl-none'
-            )}
-          >
-            {/* 
-              Note: In the new AI SDK architecture, we don't have easy access to audio_file metadata 
-              in the standard Message object unless we extend it. 
-              For now, we omit the audio indicator or we would need to pass it via data. 
-            */}
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-          </div>
-
-          {msg.role === 'user' && (
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-              <User className="h-5 w-5 text-primary-foreground" />
-            </div>
-          )}
-        </div>
+        <MessageItem key={msg.id} message={msg} />
       ))}
 
       {isLoading && (
@@ -88,4 +56,123 @@ export function MessageList() {
       <div ref={bottomRef} />
     </div>
   );
+}
+
+function MessageItem({ message }: { message: LocalMessage }) {
+  const isUser = message.role === 'user';
+  const isAssistant = message.role === 'assistant';
+  const isAudio = message.type === 'audio';
+
+  return (
+    <div
+      className={cn(
+        'flex w-full gap-3 max-w-3xl mx-auto',
+        isUser ? 'justify-end' : 'justify-start'
+      )}
+    >
+      {isAssistant && (
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <Bot className="h-5 w-5 text-primary" />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1 max-w-[80%]">
+        <div
+          className={cn(
+            'rounded-2xl overflow-hidden',
+            isUser
+              ? 'bg-primary text-primary-foreground rounded-br-none'
+              : 'bg-muted text-foreground rounded-bl-none'
+          )}
+        >
+          {/* Render audio message */}
+          {isAudio && isUser ? (
+            <div className="p-2">
+              <AudioMessage
+                audioUrl={message.audio_url}
+                audioBlob={message.audio_blob}
+                syncStatus={message.sync_status}
+                className="bg-primary/20"
+              />
+              {/* No mostramos la transcripción del lado del usuario */}
+            </div>
+          ) : (
+            <div className="px-4 py-3">
+              {/* Format assistant messages with structured lists */}
+              {isAssistant ? (
+                <FormattedAssistantMessage content={message.content} />
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Sync status indicator for user messages */}
+        {isUser && (
+          <div className="flex items-center gap-1 justify-end px-2">
+            {message.sync_status === 'pending' && (
+              <>
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Guardando...</span>
+              </>
+            )}
+            {message.sync_status === 'synced' && (
+              <>
+                <CheckCheck className="h-3 w-3 text-green-500" />
+                <span className="text-xs text-muted-foreground">Enviado</span>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isUser && (
+        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+          <User className="h-5 w-5 text-primary-foreground" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormattedAssistantMessage({ content }: { content: string }) {
+  // Check if content has structured list (starts with "Entendido:")
+  if (content.includes('Entendido:') || content.includes('•')) {
+    const lines = content.split('\n');
+    return (
+      <div className="text-sm space-y-2">
+        {lines.map((line, index) => {
+          // Header line
+          if (line.includes('Entendido:')) {
+            return (
+              <p key={index} className="font-medium">
+                {line}
+              </p>
+            );
+          }
+          // List item
+          if (line.trim().startsWith('•')) {
+            return (
+              <p key={index} className="pl-2">
+                {line}
+              </p>
+            );
+          }
+          // Regular line
+          if (line.trim()) {
+            return (
+              <p key={index} className="leading-relaxed">
+                {line}
+              </p>
+            );
+          }
+          return null;
+        })}
+      </div>
+    );
+  }
+
+  // Default rendering
+  return <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>;
 }

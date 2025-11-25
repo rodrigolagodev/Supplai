@@ -14,14 +14,49 @@ const model = genAI.getGenerativeModel({
   },
 });
 
-// Schema for parsed items
+// Valid units and categories
+const validUnits = ['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes'] as const;
+const validCategories = [
+  'fruits_vegetables',
+  'meats',
+  'fish_seafood',
+  'dry_goods',
+  'dairy',
+  'beverages',
+] as const;
+
+// Schema for parsed items with graceful error handling
 export const ParsedItemSchema = z.object({
   product: z.string(),
   quantity: z.number(),
-  unit: z.enum(['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes']),
+  unit: z
+    .union([z.enum(['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes']), z.string()])
+    .transform(val => {
+      // Validate and sanitize unit, defaulting to 'units' if invalid
+      if (typeof val !== 'string') return 'units';
+      if (validUnits.includes(val as (typeof validUnits)[number])) {
+        return val as (typeof validUnits)[number];
+      }
+      console.warn('[Gemini] Invalid unit received:', val, '- defaulting to "units"');
+      return 'units';
+    }),
   category: z
-    .enum(['fruits_vegetables', 'meats', 'fish_seafood', 'dry_goods', 'dairy', 'beverages'])
-    .optional(),
+    .union([
+      z.enum(['fruits_vegetables', 'meats', 'fish_seafood', 'dry_goods', 'dairy', 'beverages']),
+      z.string(),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional()
+    .transform(val => {
+      // Validate and sanitize category
+      if (!val || typeof val !== 'string') return undefined;
+      if (validCategories.includes(val as (typeof validCategories)[number])) {
+        return val as (typeof validCategories)[number];
+      }
+      console.warn('[Gemini] Invalid category received:', val, '- setting to undefined');
+      return undefined;
+    }),
   confidence: z.number().min(0).max(1),
   original_text: z.string().optional(),
   supplier_id: z.string().nullable().optional(),
@@ -119,10 +154,19 @@ export async function parseOrderText(
       // Parse JSON response
       const jsonResponse = JSON.parse(textResponse);
 
-      // Validate with Zod
-      const parsed = ParseResultSchema.parse(jsonResponse);
+      // Debug: Log the raw response
+      console.log('[Gemini] Raw JSON response:', JSON.stringify(jsonResponse, null, 2));
 
-      return parsed.items;
+      // Validate with Zod
+      try {
+        const parsed = ParseResultSchema.parse(jsonResponse);
+        return parsed.items;
+      } catch (zodError) {
+        console.error('[Gemini] Zod validation failed');
+        console.error('[Gemini] Raw response:', JSON.stringify(jsonResponse, null, 2));
+        console.error('[Gemini] Zod error:', zodError);
+        throw zodError;
+      }
     } catch (error) {
       console.error('Gemini parsing error:', error);
       throw error;

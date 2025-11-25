@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { eventBus } from '@/infrastructure/eventBus/EventBus';
-import { OrderEventNames } from '@/domain/events/OrderEvents';
+import { eventBus } from '@/lib/events/EventBus';
+import { OrderEventNames } from '@/features/orders/server/events/OrderEvents';
 import type { Database } from '@/types/database';
 
 /**
@@ -121,7 +121,7 @@ export class OrderCommands {
       await this.supabase.from('order_items').delete().eq('order_id', orderId);
 
       // Import and use saveParsedItems helper
-      const { saveParsedItems } = await import('@/app/(protected)/orders/actions');
+      const { saveParsedItems } = await import('@/features/orders/actions/items');
       await saveParsedItems(orderId, classifiedItems);
 
       // 7. Create summary message

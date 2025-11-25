@@ -6,7 +6,7 @@ import { useSync } from '@/context/SyncContext';
 import { OrderReviewBoard } from './OrderReviewBoard';
 import { Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getOrderReview } from '@/app/(protected)/orders/actions';
+import { getOrderReview } from '@/features/orders/queries/get-order';
 
 interface OrderReviewClientProps {
   orderId: string;

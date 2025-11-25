@@ -1,7 +1,7 @@
 import { getSuppliers, deleteSupplier } from '@/lib/actions/suppliers';
 import { getOrganizationBySlug } from '@/lib/auth/session';
 import Link from 'next/link';
-import { SupplierListItem } from '@/components/suppliers/supplier-list-item';
+import { SupplierListItem } from '@/features/suppliers/components/supplier-list-item';
 import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,16 +22,16 @@ export default async function SuppliersPage({ params }: { params: Promise<{ slug
         <h1 className="text-2xl font-bold text-foreground">Proveedores</h1>
         {organization.isAdmin && (
           <Button asChild>
-            <Link href={`/${slug}/suppliers/new`}>
-              Nuevo Proveedor
-            </Link>
+            <Link href={`/${slug}/suppliers/new`}>Nuevo Proveedor</Link>
           </Button>
         )}
       </div>
 
       <Card className="overflow-hidden">
         {suppliers.length === 0 ? (
-          <div className="p-6 text-center text-muted-foreground">No hay proveedores registrados.</div>
+          <div className="p-6 text-center text-muted-foreground">
+            No hay proveedores registrados.
+          </div>
         ) : (
           <ul role="list" className="divide-y divide-border">
             {suppliers.map(supplier => (

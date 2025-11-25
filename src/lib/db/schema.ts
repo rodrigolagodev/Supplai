@@ -17,8 +17,8 @@ export interface LocalMessage {
   role: MessageRole;
   content: string;
   type: MessageType;
-  audio_blob?: Blob; // Stored locally
-  audio_url?: string; // Remote URL after sync
+  audio_blob?: Blob; // Stored locally (before upload)
+  audio_url?: string; // UUID of audio_file_id (maps to audio_file_id in Supabase)
   created_at: string;
   sequence_number?: number;
   sync_status: SyncStatus;

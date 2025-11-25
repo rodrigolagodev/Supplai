@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // Cleanup empty draft orders (older than 7 days)
     console.error('[Cron] Starting draft cleanup...');
-    const { cleanupEmptyDrafts } = await import('@/app/(protected)/orders/actions');
+    const { cleanupEmptyDrafts } = await import('@/features/orders/actions/sync-orders');
     const cleanupResult = await cleanupEmptyDrafts(supabaseAdmin, 7);
     console.error(`[Cron] Draft cleanup completed: ${cleanupResult.deletedCount} orders deleted`);
 

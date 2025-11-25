@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { createQuickSupplier } from '@/app/(protected)/orders/actions';
+import { createQuickSupplier } from '@/features/orders/actions/suppliers';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';

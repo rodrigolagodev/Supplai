@@ -73,9 +73,9 @@ export function SupplierForm({ slug, initialData }: SupplierFormProps) {
     // Convert comma-separated keywords to array
     const keywords = formData.custom_keywords_input
       ? formData.custom_keywords_input
-        .split(',')
-        .map(k => k.trim())
-        .filter(k => k.length > 0)
+          .split(',')
+          .map(k => k.trim())
+          .filter(k => k.length > 0)
       : [];
 
     const data: FormData = {
@@ -99,7 +99,10 @@ export function SupplierForm({ slug, initialData }: SupplierFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 bg-card p-6 rounded-lg shadow border border-border">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-6 bg-card p-6 rounded-lg shadow border border-border"
+    >
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4">
           <div className="flex">
@@ -256,14 +259,9 @@ export function SupplierForm({ slug, initialData }: SupplierFormProps) {
 
       <div className="flex justify-end gap-4">
         <Button asChild variant="outline">
-          <Link href={`/${slug}/suppliers`}>
-            Cancelar
-          </Link>
+          <Link href={`/${slug}/suppliers`}>Cancelar</Link>
         </Button>
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-        >
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Guardando...' : 'Guardar'}
         </Button>
       </div>

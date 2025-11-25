@@ -70,12 +70,22 @@ function checkRateLimit(processedRecordings: ProcessedRecording[]): AudioError |
 
 interface UseAudioTranscriptionOptions {
   orderId: string;
+  /**
+   * Si es false, solo graba y retorna el blob sin transcribir (local-first mode)
+   * Si es true o undefined, graba y transcribe automáticamente (legacy mode)
+   */
+  autoTranscribe?: boolean;
   onSuccess?: (result: TranscriptionResult) => void;
+  /**
+   * Callback cuando la grabación termina (solo en modo autoTranscribe=false)
+   * Recibe el blob grabado y la duración
+   */
+  onRecordingComplete?: (blob: Blob, duration: number) => void;
   onError?: (error: AudioError) => void;
 }
 
 export function useAudioTranscription(options: UseAudioTranscriptionOptions) {
-  const { orderId, onSuccess, onError } = options;
+  const { orderId, autoTranscribe = true, onSuccess, onRecordingComplete, onError } = options;
 
   const [state, setState] = useState<AudioState>({ status: 'idle' });
 
@@ -89,6 +99,9 @@ export function useAudioTranscription(options: UseAudioTranscriptionOptions) {
   // Tracking de grabaciones procesadas (idempotencia + rate limiting)
   const processedRecordingsRef = useRef<ProcessedRecording[]>([]);
   const currentHashRef = useRef<string | null>(null);
+
+  // Flag para evitar ejecución múltiple del callback onRecordingComplete
+  const hasProcessedRecordingRef = useRef(false);
 
   /**
    * Iniciar grabación
@@ -107,6 +120,7 @@ export function useAudioTranscription(options: UseAudioTranscriptionOptions) {
       chunksRef.current = [];
       startTimeRef.current = Date.now();
       durationRef.current = 0;
+      hasProcessedRecordingRef.current = false; // Reset flag para nueva grabación
 
       // Pedir permisos de micrófono
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -311,16 +325,31 @@ export function useAudioTranscription(options: UseAudioTranscriptionOptions) {
   const reset = useCallback(() => {
     setState({ status: 'idle' });
     currentHashRef.current = null;
+    hasProcessedRecordingRef.current = false; // Reset flag
   }, []);
 
   /**
    * Procesar cuando se graba un blob
+   * Si autoTranscribe=true: sube y transcribe automáticamente (legacy mode)
+   * Si autoTranscribe=false: solo retorna el blob (local-first mode)
    */
   useEffect(() => {
-    if (state.status === 'recorded') {
-      uploadAndTranscribe(state.blob, state.duration);
+    if (state.status === 'recorded' && !hasProcessedRecordingRef.current) {
+      hasProcessedRecordingRef.current = true; // Marcar como procesado INMEDIATAMENTE
+
+      if (autoTranscribe) {
+        uploadAndTranscribe(state.blob, state.duration);
+      } else {
+        // Modo local-first: solo retornar el blob sin transcribir
+        onRecordingComplete?.(state.blob, state.duration);
+        // Reset automático para próxima grabación
+        setTimeout(() => {
+          setState({ status: 'idle' });
+          currentHashRef.current = null;
+        }, 500);
+      }
     }
-  }, [state, uploadAndTranscribe]);
+  }, [state.status, autoTranscribe, uploadAndTranscribe, onRecordingComplete]);
 
   /**
    * Cleanup

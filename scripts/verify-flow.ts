@@ -18,11 +18,16 @@ async function runVerification() {
 
   // 1. Setup: Get a test user (or create one, but let's use the first one found)
   const { data: users, error: userError } = await supabase.auth.admin.listUsers();
-  if (userError || !users.users.length) {
+  if (userError || !users || !users.users.length) {
     console.error('Failed to get users:', userError);
     return;
   }
-  const userId = users.users[0].id;
+  const firstUser = users.users[0];
+  if (!firstUser) {
+    console.error('No user found');
+    return;
+  }
+  const userId = firstUser.id;
   console.log('Using User ID:', userId);
 
   // Get organization
@@ -82,7 +87,9 @@ async function runVerification() {
   const hasMessages =
     recentDraft?.order_conversations &&
     Array.isArray(recentDraft.order_conversations) &&
-    (recentDraft.order_conversations[0] as { count: number } | undefined)?.count > 0;
+    recentDraft.order_conversations.length > 0 &&
+    (recentDraft.order_conversations[0] as { count: number } | undefined)?.count !== undefined &&
+    (recentDraft.order_conversations[0] as { count: number }).count > 0;
 
   console.log('Has Messages:', hasMessages);
 

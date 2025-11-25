@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { createDraftOrder } from '@/app/(protected)/orders/actions';
+import { createDraftOrder } from '@/features/orders/actions/create-order';
 
 /**
  * Hook to manage order lifecycle and prevent race conditions

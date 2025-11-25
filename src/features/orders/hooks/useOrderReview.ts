@@ -9,12 +9,9 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { toast } from 'sonner';
-import {
-  finalizeOrder,
-  saveOrderItems,
-  cancelOrder,
-  deleteOrderItem,
-} from '@/app/(protected)/orders/actions';
+import { finalizeOrder } from '@/features/orders/actions/send-order';
+import { saveOrderItems, deleteOrderItem } from '@/features/orders/actions/items';
+import { cancelOrder } from '@/features/orders/actions/cancel-order';
 import { Database } from '@/types/database';
 
 type OrderItem = Database['public']['Tables']['order_items']['Row'] & {

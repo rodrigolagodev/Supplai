@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+import { redirect as nextRedirect } from 'next/navigation';
 
 export default async function NewOrderPage() {
   const supabase = await createClient();
@@ -8,7 +8,7 @@ export default async function NewOrderPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login');
+    nextRedirect('/login');
   }
 
   // Get user's organization
@@ -56,5 +56,5 @@ export default async function NewOrderPage() {
 
   // Immediately redirect to the order page
   // This prevents conflicts with draft recovery and ensures stable URL
-  redirect(`/orders/${newOrder.id}`);
+  nextRedirect(`/orders/${newOrder.id}`);
 }

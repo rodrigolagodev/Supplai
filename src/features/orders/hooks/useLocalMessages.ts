@@ -15,6 +15,10 @@ export function useLocalMessages(orderId: string) {
     type: MessageType = 'text',
     audioBlob?: Blob
   ) => {
+    // Get current max sequence number
+    const allMessages = await db.messages.where('order_id').equals(orderId).toArray();
+    const maxSeq = allMessages.reduce((max, msg) => Math.max(max, msg.sequence_number || 0), 0);
+
     const newMessage: LocalMessage = {
       id: uuidv4(),
       order_id: orderId,
@@ -23,6 +27,7 @@ export function useLocalMessages(orderId: string) {
       type,
       audio_blob: audioBlob,
       created_at: new Date().toISOString(),
+      sequence_number: maxSeq + 1,
       sync_status: 'pending',
     };
 
@@ -30,9 +35,20 @@ export function useLocalMessages(orderId: string) {
     return newMessage.id;
   };
 
+  const updateMessage = async (
+    messageId: string,
+    updates: Partial<Omit<LocalMessage, 'id' | 'order_id' | 'created_at'>>
+  ) => {
+    await db.messages.update(messageId, {
+      ...updates,
+      sync_status: 'pending', // Mark as pending to sync updated content
+    });
+  };
+
   return {
     messages: messages || [],
     addMessage,
+    updateMessage,
     isLoading: messages === undefined,
   };
 }

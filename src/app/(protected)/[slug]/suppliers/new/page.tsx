@@ -1,4 +1,4 @@
-import { SupplierForm } from '@/components/suppliers/supplier-form';
+import { SupplierForm } from '@/features/suppliers/components/supplier-form';
 import { getOrganizationBySlug } from '@/lib/auth/session';
 import { notFound, redirect } from 'next/navigation';
 
