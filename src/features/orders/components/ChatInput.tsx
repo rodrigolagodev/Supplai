@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, memo } from 'react';
+import React, { useRef, useEffect, memo } from 'react';
 import { useOrderChat } from '@/context/OrderChatContext';
 import { VoiceRecorderButton } from './VoiceRecorderButton';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
  * when orderId changes in the context (which doesn't affect this component's UI)
  */
 export const ChatInput = memo(function ChatInput() {
-  const { processText, processTranscription, isProcessing, orderId } = useOrderChat();
-  const [input, setInput] = useState('');
+  const { input, handleInputChange, handleSubmit, processTranscription, isLoading, orderId } =
+    useOrderChat();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -25,25 +25,10 @@ export const ChatInput = memo(function ChatInput() {
     }
   }, [input]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!input.trim() || isProcessing) return;
-
-    const text = input;
-    setInput('');
-
-    // Reset height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'inherit';
-    }
-
-    await processText(text);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
     }
   };
 
@@ -54,19 +39,18 @@ export const ChatInput = memo(function ChatInput() {
           <Textarea
             ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={handleInputChange}
+            onKeyDown={onKeyDown}
             placeholder="Escribe tu pedido o usa el micrófono..."
             className="min-h-[48px] max-h-[150px] resize-none pr-12 py-3 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary"
-            disabled={isProcessing}
             rows={1}
           />
           <Button
             size="icon"
             variant="ghost"
             className="absolute right-1 bottom-1 h-10 w-10 text-primary hover:bg-primary/10 disabled:opacity-50"
-            onClick={() => handleSubmit()}
-            disabled={!input.trim() || isProcessing}
+            onClick={e => handleSubmit(e as unknown as React.FormEvent)}
+            disabled={!input.trim() || isLoading}
           >
             <SendHorizontal className="h-5 w-5" />
           </Button>

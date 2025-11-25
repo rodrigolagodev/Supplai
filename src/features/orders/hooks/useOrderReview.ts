@@ -14,7 +14,7 @@ import {
   saveOrderItems,
   cancelOrder,
   deleteOrderItem,
-} from '@/app/(protected)/orders/[id]/actions';
+} from '@/app/(protected)/orders/actions';
 import { Database } from '@/types/database';
 
 type OrderItem = Database['public']['Tables']['order_items']['Row'] & {

@@ -3,16 +3,16 @@
 import React, { useEffect, useRef } from 'react';
 import { useOrderChat } from '@/context/OrderChatContext';
 import { cn } from '@/lib/utils';
-import { Bot, User, FileAudio } from 'lucide-react';
+import { Bot, User } from 'lucide-react';
 
 export function MessageList() {
-  const { messages, isProcessing, currentStatus } = useOrderChat();
+  const { messages, isLoading, currentStatus } = useOrderChat();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isProcessing]);
+  }, [messages, isLoading]);
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -49,12 +49,11 @@ export function MessageList() {
                 : 'bg-muted text-foreground rounded-bl-none'
             )}
           >
-            {msg.audio_file && (
-              <div className="flex items-center gap-2 mb-2 text-xs opacity-80 border-b border-white/20 pb-2">
-                <FileAudio className="h-3 w-3" />
-                <span>Audio grabado</span>
-              </div>
-            )}
+            {/* 
+              Note: In the new AI SDK architecture, we don't have easy access to audio_file metadata 
+              in the standard Message object unless we extend it. 
+              For now, we omit the audio indicator or we would need to pass it via data. 
+            */}
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
           </div>
 
@@ -66,7 +65,7 @@ export function MessageList() {
         </div>
       ))}
 
-      {isProcessing && (
+      {isLoading && (
         <div className="flex w-full gap-3 max-w-3xl mx-auto justify-start">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <Bot className="h-5 w-5 text-primary" />
@@ -79,7 +78,7 @@ export function MessageList() {
             </span>
             <span className="text-xs text-muted-foreground ml-2 capitalize">
               {currentStatus === 'transcribing' && 'Transcribiendo audio...'}
-              {currentStatus === 'parsing' && 'Analizando pedido...'}
+              {currentStatus === 'parsing' && 'Escribiendo...'}
               {currentStatus === 'classifying' && 'Buscando proveedores...'}
             </span>
           </div>

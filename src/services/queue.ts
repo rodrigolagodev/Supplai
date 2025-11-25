@@ -16,10 +16,19 @@ export class JobQueue {
   static async enqueue(type: JobType, payload: JobPayload, client?: SupabaseClient) {
     const supabase = client ?? (await createClient());
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error('User must be authenticated to enqueue jobs');
+    }
+
     const { error } = await supabase.from('jobs').insert({
       type,
       payload,
       status: 'pending',
+      user_id: user.id,
     });
 
     if (error) {

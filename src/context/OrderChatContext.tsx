@@ -1,23 +1,23 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { Database } from '@/types/database';
-import { saveConversationMessage } from '@/app/(protected)/orders/actions';
+import React, { createContext, useContext, useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-
-type Message = Database['public']['Tables']['order_conversations']['Row'] & {
-  audio_file?: Database['public']['Tables']['order_audio_files']['Row'] | null;
-};
+import { useLocalMessages } from '@/features/orders/hooks/useLocalMessages';
+import { useLocalOrder } from '@/features/orders/hooks/useLocalOrder';
+import { useSync } from '@/context/SyncContext';
+import { LocalMessage } from '@/lib/db/schema';
 
 interface OrderChatContextType {
   orderId: string;
-  messages: Message[];
+  messages: LocalMessage[];
+  input: string;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  isLoading: boolean;
   isProcessing: boolean;
-  currentStatus: string; // 'listening' | 'transcribing' | 'parsing' | 'classifying' | 'idle'
-  addMessage: (role: 'user' | 'assistant', content: string, audioFileId?: string) => Promise<void>;
+  currentStatus: string;
   processAudio: (audioBlob: Blob) => Promise<void>;
   processTranscription: (result: { transcription: string; audioFileId: string }) => Promise<void>;
-  processText: (text: string) => Promise<void>;
   processOrder: () => Promise<void>;
 }
 
@@ -26,95 +26,51 @@ const OrderChatContext = createContext<OrderChatContextType | undefined>(undefin
 export function OrderChatProvider({
   children,
   orderId,
-  initialMessages = [],
   onOrderProcessed,
 }: {
   children: React.ReactNode;
   orderId: string;
   organizationId: string;
-  initialMessages?: Message[];
+  initialMessages?: Array<{ id: string; role: string; content: string; [key: string]: unknown }>;
   onOrderProcessed?: (redirectUrl: string) => void;
 }) {
-  // orderId is now always provided (eager creation in page.tsx)
-  // No lazy creation needed - orderId never changes during conversation
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { messages, addMessage } = useLocalMessages(orderId);
+  const { updateStatus } = useLocalOrder(orderId);
+  const { syncNow, isOnline } = useSync();
+
+  const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState('idle');
 
-  // Debug logging to track component lifecycle
-  useEffect(() => {
-    console.error(
-      `[OrderChat] Component mounted. OrderId: ${orderId}, Initial messages: ${initialMessages.length}`
-    );
-  }, [orderId, initialMessages.length]);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setInput(e.target.value);
+    },
+    []
+  );
 
-  const addMessage = useCallback(
-    async (role: 'user' | 'assistant', content: string, audioFileId?: string) => {
-      // orderId is always available (eager creation)
-      // No lazy creation or state changes needed
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!input.trim()) return;
 
-      const tempId = crypto.randomUUID();
-      let sequenceNumber: number;
-
-      // Use functional update to avoid race conditions
-      // Calculate sequence number based on ACTUAL current state, not closure
-      setMessages(prev => {
-        // Generate sequence number based on current message count
-        // This ensures chronological ordering even if created_at has clock skew
-        sequenceNumber = prev.length + 1;
-
-        const newMessage: Message = {
-          id: tempId,
-          order_id: orderId,
-          role,
-          content,
-          audio_file_id: audioFileId || null,
-          created_at: new Date().toISOString(),
-        };
-
-        console.error(
-          `[OrderChat] Adding message #${sequenceNumber} to local state. Total messages: ${prev.length + 1}`
-        );
-
-        return [...prev, newMessage];
-      });
+      const userMessage = input;
+      setInput(''); // Clear input immediately
 
       try {
-        // sequenceNumber is guaranteed to be set from setMessages above
-        console.error(`[OrderChat] Saving message #${sequenceNumber!} to DB. OrderId: ${orderId}`);
-        await saveConversationMessage(orderId, role, content, audioFileId, sequenceNumber!);
-        console.error(`[OrderChat] Message #${sequenceNumber!} saved successfully`);
-      } catch (error) {
-        console.error(`[OrderChat] FAILED to save message #${sequenceNumber!}:`, error);
+        await addMessage(userMessage, 'user', 'text');
+      } catch (err) {
+        console.error('Failed to save message:', err);
+        setInput(userMessage); // Restore input on error
         toast.error('Error al guardar el mensaje');
       }
     },
-    [orderId]
-  );
-
-  const processText = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
-
-      setIsProcessing(true);
-      try {
-        // Just add the message, no processing
-        await addMessage('user', text);
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [addMessage]
+    [input, addMessage]
   );
 
   const processTranscription = useCallback(
     async (result: { transcription: string; audioFileId: string }) => {
-      setIsProcessing(true);
-      try {
-        // The transcription is already done, just add the message
-        await addMessage('user', result.transcription, result.audioFileId);
-      } finally {
-        setIsProcessing(false);
+      if (result.transcription) {
+        await addMessage(result.transcription, 'user', 'text');
       }
     },
     [addMessage]
@@ -122,117 +78,69 @@ export function OrderChatProvider({
 
   const processAudio = useCallback(
     async (audioBlob: Blob) => {
-      setIsProcessing(true);
-      setCurrentStatus('transcribing');
-
       try {
-        // orderId is always available (eager creation)
-        // 1. Upload and transcribe
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
-        formData.append('orderId', orderId);
-
-        const response = await fetch('/api/process-audio', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const status = response.status;
-          const statusText = response.statusText;
-          const rawText = await response.text();
-          console.error(`Server error (${status} ${statusText}):`, rawText);
-
-          let errorMessage = 'Error en la transcripción';
-          try {
-            const json = JSON.parse(rawText);
-            if (json.error) errorMessage = json.error;
-          } catch {
-            // Not JSON, use status text or generic
-            if (status === 413) errorMessage = 'El archivo de audio es demasiado grande';
-          }
-
-          throw new Error(errorMessage);
-        }
-
-        const { transcription, audioFileId } = await response.json();
-
-        // 2. Add user message with audio
-        await addMessage('user', transcription, audioFileId);
+        await addMessage('[Audio]', 'user', 'audio', audioBlob);
       } catch (error) {
-        console.error('Audio processing error:', error);
-        toast.error('Error al procesar el audio');
-      } finally {
-        setIsProcessing(false);
-        setCurrentStatus('idle');
+        console.error('Error saving audio:', error);
+        toast.error('Error al guardar el audio');
       }
     },
-    [orderId, addMessage]
+    [addMessage]
   );
 
-  // Process order: validate user messages and call batch processing
   const processOrder = useCallback(async () => {
-    // Check for user messages
-    const hasUserMessages = messages.some(m => m.role === 'user');
-    if (!hasUserMessages) {
-      toast.error('No hay mensajes para procesar.');
-      return;
-    }
-
-    // orderId is always available (eager creation)
     setIsProcessing(true);
-    setCurrentStatus('parsing');
-
     try {
-      const { processOrderBatch } = await import('@/app/(protected)/orders/actions');
-      const result = await processOrderBatch(orderId);
+      await updateStatus('review');
 
-      if (result.redirectUrl) {
-        // Notify parent component to handle navigation
-        onOrderProcessed?.(result.redirectUrl);
-        return;
+      if (isOnline) {
+        toast.info('Sincronizando y procesando...');
+        await syncNow();
+
+        try {
+          const { processOrderBatch } = await import('@/app/(protected)/orders/actions');
+          await processOrderBatch(orderId);
+        } catch (e) {
+          console.error('Error triggering batch process:', e);
+        }
+      } else {
+        toast.info('Guardado localmente. Se procesará al conectar.');
       }
 
-      if (result.message) {
-        await addMessage('assistant', result.message);
+      if (onOrderProcessed) {
+        onOrderProcessed(`/orders/${orderId}/review`);
       }
-      toast.success('Pedido procesado correctamente');
     } catch (error) {
-      console.error('Batch processing error:', error);
-      toast.error('Error al procesar el pedido');
-      await addMessage(
-        'assistant',
-        'Hubo un error al procesar el pedido. Por favor intenta de nuevo.'
-      );
+      console.error('Error processing order:', error);
+      toast.error('Error al procesar');
     } finally {
       setIsProcessing(false);
-      setCurrentStatus('idle');
     }
-  }, [messages, orderId, addMessage, onOrderProcessed]);
+  }, [orderId, onOrderProcessed, isOnline, syncNow, updateStatus]);
 
-  // Memoize context value to prevent unnecessary re-renders in child components
-  // Only re-create when actual dependencies change
   const contextValue = useMemo(
     () => ({
       orderId,
-      messages,
+      messages: messages || [],
+      input,
+      handleInputChange,
+      handleSubmit,
+      isLoading: isProcessing,
       isProcessing,
-      currentStatus,
-      addMessage,
+      currentStatus: isProcessing ? 'processing' : 'idle',
       processAudio,
       processTranscription,
-      processText,
       processOrder,
     }),
     [
       orderId,
       messages,
+      input,
+      handleInputChange,
+      handleSubmit,
       isProcessing,
-      currentStatus,
-      addMessage,
       processAudio,
       processTranscription,
-      processText,
       processOrder,
     ]
   );

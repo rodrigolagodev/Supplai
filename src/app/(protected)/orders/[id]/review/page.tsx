@@ -1,5 +1,5 @@
-import { getOrderReview } from '../actions';
-import { OrderReviewBoard } from '@/features/orders/components/review/OrderReviewBoard';
+import { getOrderReview } from '../../actions';
+import { OrderReviewClient } from '@/features/orders/components/review/OrderReviewClient';
 import { redirect } from 'next/navigation';
 
 interface PageProps {
@@ -10,12 +10,20 @@ interface PageProps {
 
 export default async function OrderReviewPage({ params }: PageProps) {
   const { id } = await params;
-  const { order, items, suppliers, userRole } = await getOrderReview(id);
 
-  // Protect against editing sent/archived orders
-  if (order.status === 'sent' || order.status === 'archived') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    redirect(`/orders/${id}/details` as any);
+  let initialData = null;
+
+  try {
+    initialData = await getOrderReview(id);
+
+    // Protect against editing sent/archived orders
+    if (initialData.order.status === 'sent' || initialData.order.status === 'archived') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      redirect(`/orders/${id}/details` as any);
+    }
+  } catch (error) {
+    console.error('Failed to fetch order review data (possibly offline):', error);
+    // We continue with null initialData to let the Client Component handle the offline state
   }
 
   return (
@@ -27,13 +35,7 @@ export default async function OrderReviewPage({ params }: PageProps) {
         </p>
       </div>
 
-      <OrderReviewBoard
-        orderId={order.id}
-        initialItems={items}
-        suppliers={suppliers}
-        userRole={userRole}
-        organizationId={order.organization_id}
-      />
+      <OrderReviewClient orderId={id} initialData={initialData} />
     </div>
   );
 }

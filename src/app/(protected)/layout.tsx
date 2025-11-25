@@ -1,11 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getSessionOrRedirect, getUserOrganizations } from '@/lib/auth/session';
+import { SyncProvider } from '@/context/SyncContext';
 
-export default async function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   await getSessionOrRedirect();
 
   // Check if user has any organizations
@@ -17,5 +14,5 @@ export default async function ProtectedLayout({
     redirect('/onboarding' as any);
   }
 
-  return <>{children}</>;
+  return <SyncProvider>{children}</SyncProvider>;
 }
