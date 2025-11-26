@@ -120,7 +120,7 @@ serve(async req => {
     // 3. Send Email via Resend
     console.log(`[EdgeFunction] Sending email to ${supplier.email}`);
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: 'PedidosAI <orders@pedidosai.com>',
+      from: 'PedidosAI <onboarding@resend.dev>',
       to: [supplier.email],
       subject: `New Order #${supplierOrder.order_number || supplierOrder.id}`,
       html: emailHtml,
