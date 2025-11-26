@@ -16,6 +16,50 @@ interface JobRecord {
   supplier_order_id?: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  email: string;
+  [key: string]: unknown;
+}
+
+interface Organization {
+  name: string;
+  [key: string]: unknown;
+}
+
+interface Order {
+  id: string;
+  organization?: Organization;
+  [key: string]: unknown;
+}
+
+interface SupplierOrder {
+  id: string;
+  order_id: string;
+  supplier_id: string;
+  order?: Order;
+  supplier?: Supplier;
+  [key: string]: unknown;
+}
+
+interface OrderItem {
+  id: string;
+  order_id: string;
+  supplier_id: string;
+  product: string;
+  quantity: number;
+  unit: string;
+  [key: string]: unknown;
+}
+
+interface Job {
+  id: string;
+  status: string;
+  attempts: number;
+  [key: string]: unknown;
+}
+
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -51,13 +95,15 @@ serve(async req => {
       .eq('id', jobId)
       .single();
 
-    if (jobFetchError) {
+    if (jobFetchError || !currentJob) {
       console.error(`[EdgeFunction] Job ${jobId} not found:`, jobFetchError);
-      throw new Error(`Job not found: ${jobFetchError.message}`);
+      throw new Error(`Job not found: ${jobFetchError?.message}`);
     }
 
+    const job = currentJob as Job;
+
     // If already completed, return success without reprocessing
-    if (currentJob.status === 'completed') {
+    if (job.status === 'completed') {
       console.log(`[EdgeFunction] Job ${jobId} already completed, skipping`);
       return new Response(JSON.stringify({ message: 'Job already completed', jobId }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -65,14 +111,11 @@ serve(async req => {
     }
 
     // If not pending, skip (might be processing by another instance)
-    if (currentJob.status !== 'pending') {
-      console.warn(`[EdgeFunction] Job ${jobId} has status ${currentJob.status}, skipping`);
-      return new Response(
-        JSON.stringify({ message: `Job status is ${currentJob.status}`, jobId }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (job.status !== 'pending') {
+      console.warn(`[EdgeFunction] Job ${jobId} has status ${job.status}, skipping`);
+      return new Response(JSON.stringify({ message: `Job status is ${job.status}`, jobId }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Mark as processing
@@ -81,19 +124,26 @@ serve(async req => {
       .update({ status: 'processing', updated_at: new Date().toISOString() })
       .eq('id', jobId);
 
-    // 1. Fetch supplier order and supplier details
-    const { data: supplierOrder, error: orderError } = await supabaseClient
+    // 1. Fetch supplier order with full details
+    const { data: supplierOrderData, error: orderError } = await supabaseClient
       .from('supplier_orders')
-      .select('*, suppliers(*)')
+      .select(
+        `
+        *,
+        order: orders(*, organization: organizations(name)),
+        supplier: suppliers(*)
+      `
+      )
       .eq('id', supplierOrderId)
       .single();
 
-    if (orderError || !supplierOrder) {
+    if (orderError || !supplierOrderData) {
       console.error(`[EdgeFunction] Order ${supplierOrderId} not found:`, orderError);
       throw new Error(`Order not found: ${orderError?.message}`);
     }
 
-    const supplier = supplierOrder.suppliers;
+    const supplierOrder = supplierOrderData as SupplierOrder;
+    const supplier = supplierOrder.supplier;
     if (!supplier || !supplier.email) {
       console.error(`[EdgeFunction] Supplier email not found for order ${supplierOrderId}`);
       // This is a permanent error - mark as failed immediately
@@ -108,21 +158,77 @@ serve(async req => {
       throw new Error('Supplier email not found');
     }
 
-    // 2. Generate Email Content
+    // 2. Update status to sending
+    await supabaseClient
+      .from('supplier_orders')
+      .update({ status: 'sending' })
+      .eq('id', supplierOrderId);
+
+    // 3. Fetch items for this supplier
+    const { data: itemsData, error: itemsError } = await supabaseClient
+      .from('order_items')
+      .select('*')
+      .eq('order_id', supplierOrder.order_id)
+      .eq('supplier_id', supplierOrder.supplier_id);
+
+    if (itemsError || !itemsData || itemsData.length === 0) {
+      console.error(`[EdgeFunction] No items found for supplier order ${supplierOrderId}`);
+      throw new Error('No items found for this supplier order');
+    }
+
+    const items = itemsData as OrderItem[];
+
+    // 4. Generate Email Content with proper template
+    const organizationName = supplierOrder.order?.organization?.name || 'Organización';
+    const itemsHtml = items
+      .map(
+        item => `
+        <li style="margin-bottom: 4px;">
+          <strong>${item.quantity} ${item.unit}</strong> de ${item.product}
+        </li>
+      `
+      )
+      .join('');
+
     const emailHtml = `
-      <h1>New Order from PedidosAI</h1>
-      <p>Order ID: ${supplierOrder.id}</p>
-      <p>Order Number: ${supplierOrder.order_number || 'N/A'}</p>
-      <p>Please check the attached details.</p>
-      <p>${supplierOrder.message || ''}</p>
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f8fafc; border-radius: 8px; padding: 32px; margin-bottom: 24px;">
+            <h1 style="color: #1e40af; margin: 0 0 16px 0; font-size: 24px;">
+              Nuevo Pedido
+            </h1>
+            <p style="margin: 0 0 16px 0;">
+              Hola, <strong>${organizationName}</strong> ha realizado un nuevo pedido.
+            </p>
+
+            <div style="background-color: white; border-radius: 6px; padding: 16px; border: 1px solid #e2e8f0;">
+              <div style="margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
+                <h3 style="color: #475569; margin: 0 0 8px 0; font-size: 16px;">${supplier.name}</h3>
+                <ul style="margin: 0; padding-left: 20px;">
+                  ${itemsHtml}
+                </ul>
+              </div>
+            </div>
+
+            <p style="margin: 24px 0 0 0; font-size: 14px; color: #64748b;">
+              Este es un mensaje automático enviado desde Pedidos AI.
+            </p>
+          </div>
+        </body>
+      </html>
     `;
 
-    // 3. Send Email via Resend
+    // 5. Send Email via Resend
     console.log(`[EdgeFunction] Sending email to ${supplier.email}`);
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: 'PedidosAI <onboarding@resend.dev>',
+      from: 'Pedidos <onboarding@resend.dev>',
       to: [supplier.email],
-      subject: `New Order #${supplierOrder.order_number || supplierOrder.id}`,
+      subject: `Nuevo pedido de ${organizationName}`,
       html: emailHtml,
     });
 
@@ -132,27 +238,25 @@ serve(async req => {
       // Determine if error is retriable
       const isRetriable = isRetriableError(emailError);
 
-      if (isRetriable && currentJob.attempts < 2) {
+      if (isRetriable && job.attempts < 2) {
         // Mark as pending for retry
         await supabaseClient
           .from('jobs')
           .update({
             status: 'pending',
-            attempts: currentJob.attempts + 1,
+            attempts: job.attempts + 1,
             last_error: `Resend error: ${emailError.message}`,
             updated_at: new Date().toISOString(),
           })
           .eq('id', jobId);
-        console.log(
-          `[EdgeFunction] Job ${jobId} marked for retry (attempt ${currentJob.attempts + 1})`
-        );
+        console.log(`[EdgeFunction] Job ${jobId} marked for retry (attempt ${job.attempts + 1})`);
       } else {
         // Mark as failed permanently
         await supabaseClient
           .from('jobs')
           .update({
             status: 'failed',
-            attempts: currentJob.attempts + 1,
+            attempts: job.attempts + 1,
             last_error: `Resend error: ${emailError.message}`,
             updated_at: new Date().toISOString(),
           })
@@ -167,7 +271,7 @@ serve(async req => {
       `[EdgeFunction] Email sent successfully for job ${jobId}, email ID: ${emailData?.id}`
     );
 
-    // 4. Update Job Status to completed
+    // 6. Update Job Status to completed
     await supabaseClient
       .from('jobs')
       .update({
@@ -177,10 +281,14 @@ serve(async req => {
       })
       .eq('id', jobId);
 
-    // 5. Update Supplier Order Status (for Realtime feedback)
+    // 7. Update Supplier Order Status (for Realtime feedback)
     await supabaseClient
       .from('supplier_orders')
-      .update({ status: 'sent' })
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        error_message: null,
+      })
       .eq('id', supplierOrderId);
 
     console.log(`[EdgeFunction] Job ${jobId} completed successfully`);
