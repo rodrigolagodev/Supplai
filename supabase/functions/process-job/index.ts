@@ -119,10 +119,18 @@ serve(async req => {
     }
 
     // Mark as processing
-    await supabaseClient
+    const { error: processingUpdateError } = await supabaseClient
       .from('jobs')
       .update({ status: 'processing', updated_at: new Date().toISOString() })
       .eq('id', jobId);
+
+    if (processingUpdateError) {
+      console.error(
+        `[EdgeFunction] Failed to mark job ${jobId} as processing:`,
+        processingUpdateError
+      );
+      throw new Error(`Failed to mark job as processing: ${processingUpdateError.message}`);
+    }
 
     // 1. Fetch supplier order with full details
     const { data: supplierOrderData, error: orderError } = await supabaseClient
@@ -159,10 +167,18 @@ serve(async req => {
     }
 
     // 2. Update status to sending
-    await supabaseClient
+    const { error: sendingUpdateError } = await supabaseClient
       .from('supplier_orders')
       .update({ status: 'sending' })
       .eq('id', supplierOrderId);
+
+    if (sendingUpdateError) {
+      console.error(
+        `[EdgeFunction] Failed to update supplier_order ${supplierOrderId} to sending:`,
+        sendingUpdateError
+      );
+      throw new Error(`Failed to update to sending status: ${sendingUpdateError.message}`);
+    }
 
     // 3. Fetch items for this supplier
     const { data: itemsData, error: itemsError } = await supabaseClient
@@ -240,7 +256,7 @@ serve(async req => {
 
       if (isRetriable && job.attempts < 2) {
         // Mark as pending for retry
-        await supabaseClient
+        const { error: retryJobError } = await supabaseClient
           .from('jobs')
           .update({
             status: 'pending',
@@ -250,8 +266,12 @@ serve(async req => {
           })
           .eq('id', jobId);
 
+        if (retryJobError) {
+          console.error(`[EdgeFunction] Failed to mark job ${jobId} for retry:`, retryJobError);
+        }
+
         // Revert supplier_order status back to pending for retry
-        await supabaseClient
+        const { error: retryOrderError } = await supabaseClient
           .from('supplier_orders')
           .update({
             status: 'pending',
@@ -259,10 +279,17 @@ serve(async req => {
           })
           .eq('id', supplierOrderId);
 
+        if (retryOrderError) {
+          console.error(
+            `[EdgeFunction] Failed to revert supplier_order ${supplierOrderId} to pending:`,
+            retryOrderError
+          );
+        }
+
         console.log(`[EdgeFunction] Job ${jobId} marked for retry (attempt ${job.attempts + 1})`);
       } else {
         // Mark as failed permanently
-        await supabaseClient
+        const { error: failJobError } = await supabaseClient
           .from('jobs')
           .update({
             status: 'failed',
@@ -272,14 +299,25 @@ serve(async req => {
           })
           .eq('id', jobId);
 
+        if (failJobError) {
+          console.error(`[EdgeFunction] Failed to mark job ${jobId} as failed:`, failJobError);
+        }
+
         // Mark supplier_order as failed
-        await supabaseClient
+        const { error: failOrderError } = await supabaseClient
           .from('supplier_orders')
           .update({
             status: 'failed',
             error_message: `Resend error: ${emailError.message}`,
           })
           .eq('id', supplierOrderId);
+
+        if (failOrderError) {
+          console.error(
+            `[EdgeFunction] Failed to mark supplier_order ${supplierOrderId} as failed:`,
+            failOrderError
+          );
+        }
 
         console.error(`[EdgeFunction] Job ${jobId} marked as failed permanently`);
       }
@@ -292,7 +330,7 @@ serve(async req => {
     );
 
     // 6. Update Job Status to completed
-    await supabaseClient
+    const { error: jobUpdateError } = await supabaseClient
       .from('jobs')
       .update({
         status: 'completed',
@@ -301,8 +339,13 @@ serve(async req => {
       })
       .eq('id', jobId);
 
+    if (jobUpdateError) {
+      console.error(`[EdgeFunction] Failed to update job ${jobId} status:`, jobUpdateError);
+      throw new Error(`Failed to update job status: ${jobUpdateError.message}`);
+    }
+
     // 7. Update Supplier Order Status (for Realtime feedback)
-    await supabaseClient
+    const { error: supplierOrderUpdateError } = await supabaseClient
       .from('supplier_orders')
       .update({
         status: 'sent',
@@ -311,7 +354,19 @@ serve(async req => {
       })
       .eq('id', supplierOrderId);
 
-    console.log(`[EdgeFunction] Job ${jobId} completed successfully`);
+    if (supplierOrderUpdateError) {
+      console.error(
+        `[EdgeFunction] Failed to update supplier_order ${supplierOrderId} status:`,
+        supplierOrderUpdateError
+      );
+      throw new Error(
+        `Failed to update supplier_order status: ${supplierOrderUpdateError.message}`
+      );
+    }
+
+    console.log(
+      `[EdgeFunction] Job ${jobId} completed successfully - supplier_order ${supplierOrderId} marked as sent`
+    );
 
     return new Response(
       JSON.stringify({

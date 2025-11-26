@@ -20,9 +20,9 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { LiveOrderStatusBadge } from '@/components/orders/LiveOrderStatusBadge';
 
 import { LucideIcon } from 'lucide-react';
 
@@ -102,9 +102,11 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
         </div>
 
         <div className="flex items-center gap-4">
-          <Badge variant="secondary" className={config.color}>
-            {config.label}
-          </Badge>
+          <LiveOrderStatusBadge
+            orderId={item.id}
+            initialStatus={item.status}
+            type={item.type === 'supplier_order' ? 'supplier_order' : 'order'}
+          />
 
           <div className="hidden md:flex items-center gap-2">
             {item.createdBy.avatarUrl ? (

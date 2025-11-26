@@ -22,9 +22,8 @@ export async function generateMetadata({ params }: DashboardPageProps) {
   };
 }
 
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { getHistoryOrders } from './history/actions';
+import { RecentActivityList } from '@/components/dashboard/RecentActivityList';
 
 export default async function DashboardPage({ params }: DashboardPageProps) {
   const { slug } = await params;
@@ -103,78 +102,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Actividad Reciente</h3>
         </div>
-
-        {!recentOrders || recentOrders.length === 0 ? (
-          <div className="p-6 text-center text-sm text-gray-500">
-            No hay actividad reciente. ¡Crea tu primer pedido!
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {recentOrders.map(item => (
-              <div key={item.id} className="flex items-center justify-between p-6 hover:bg-gray-50">
-                <div className="flex flex-col space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">
-                      {item.type === 'supplier_order' && item.supplier
-                        ? item.supplier.name
-                        : `Pedido #${item.displayId}`}
-                    </span>
-                    {item.type === 'supplier_order' && (
-                      <span className="text-xs text-gray-500">#{item.displayId}</span>
-                    )}
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {formatDistanceToNow(new Date(item.createdAt), {
-                      addSuffix: true,
-                      locale: es,
-                    })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                    ${
-                      item.status === 'sent' || item.status === 'delivered'
-                        ? 'bg-green-100 text-green-800'
-                        : item.status === 'draft'
-                          ? 'bg-gray-100 text-gray-800'
-                          : item.status === 'review'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : item.status === 'sending'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {item.status === 'sent'
-                      ? 'Enviado'
-                      : item.status === 'delivered'
-                        ? 'Entregado'
-                        : item.status === 'draft'
-                          ? 'Borrador'
-                          : item.status === 'review'
-                            ? 'Revisión'
-                            : item.status === 'sending'
-                              ? 'Enviando'
-                              : item.status}
-                  </span>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link
-                      href={
-                        item.type === 'supplier_order'
-                          ? `/orders/${item.id}/details`
-                          : item.status === 'review'
-                            ? `/orders/${item.id}/review`
-                            : `/orders/${item.id}`
-                      }
-                    >
-                      {item.status === 'draft' ? 'Continuar' : 'Ver'}
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <RecentActivityList orders={recentOrders} />
       </div>
     </div>
   );
