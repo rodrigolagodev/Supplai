@@ -249,6 +249,16 @@ serve(async req => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', jobId);
+
+        // Revert supplier_order status back to pending for retry
+        await supabaseClient
+          .from('supplier_orders')
+          .update({
+            status: 'pending',
+            error_message: `Rate limit exceeded - will retry (attempt ${job.attempts + 1})`,
+          })
+          .eq('id', supplierOrderId);
+
         console.log(`[EdgeFunction] Job ${jobId} marked for retry (attempt ${job.attempts + 1})`);
       } else {
         // Mark as failed permanently
@@ -261,6 +271,16 @@ serve(async req => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', jobId);
+
+        // Mark supplier_order as failed
+        await supabaseClient
+          .from('supplier_orders')
+          .update({
+            status: 'failed',
+            error_message: `Resend error: ${emailError.message}`,
+          })
+          .eq('id', supplierOrderId);
+
         console.error(`[EdgeFunction] Job ${jobId} marked as failed permanently`);
       }
 
