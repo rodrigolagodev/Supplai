@@ -4,6 +4,32 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * Get the base URL for the application
+ * Prioritizes NEXT_PUBLIC_SITE_URL, falls back to VERCEL_URL for Vercel deployments
+ */
+function getBaseUrl(): string {
+  // 1. Check explicit site URL (works in all environments)
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+
+  // 2. Vercel auto-provides VERCEL_URL in production/preview
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  // 3. Fallback for local development
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
+
+  // 4. No URL available - this should never happen in production if configured correctly
+  throw new Error(
+    'Missing NEXT_PUBLIC_SITE_URL environment variable. Please configure it in your deployment platform.'
+  );
+}
+
 export interface AuthActionResult {
   success: boolean;
   error?: string;
@@ -51,7 +77,7 @@ export async function signUp(
       data: {
         full_name: fullName,
       },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/auth/confirm`,
+      emailRedirectTo: `${getBaseUrl()}/auth/callback?next=/auth/confirm`,
     },
   });
 
@@ -101,7 +127,7 @@ export async function resetPassword(email: string): Promise<AuthActionResult> {
   const supabase = await createClient();
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
+    redirectTo: `${getBaseUrl()}/reset-password`,
   });
 
   if (error) {
