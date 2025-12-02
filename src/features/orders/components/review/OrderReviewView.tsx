@@ -33,8 +33,6 @@ interface OrderReviewViewProps {
   isCancelling: boolean;
   showAllSuppliers: boolean;
   setShowAllSuppliers: (show: boolean) => void;
-  showBackConfirm: boolean;
-  setShowBackConfirm: (show: boolean) => void;
   showCancelConfirm: boolean;
   setShowCancelConfirm: (show: boolean) => void;
 
@@ -57,10 +55,10 @@ interface OrderReviewViewProps {
   handleSave: () => void;
   handleFinalize: () => void;
   handleCancelOrder: () => void;
-  handleBack: () => void;
 
   // Context
   organizationId: string;
+  organizationSlug: string;
   userRole: string;
 }
 
@@ -73,8 +71,6 @@ export function OrderReviewView({
   isCancelling,
   showAllSuppliers,
   setShowAllSuppliers,
-  showBackConfirm,
-  setShowBackConfirm,
   showCancelConfirm,
   setShowCancelConfirm,
   unclassifiedItems,
@@ -90,8 +86,8 @@ export function OrderReviewView({
   handleSave,
   handleFinalize,
   handleCancelOrder,
-  handleBack,
   organizationId,
+  organizationSlug,
   userRole,
 }: OrderReviewViewProps) {
   return (
@@ -101,19 +97,15 @@ export function OrderReviewView({
           isFinalizing={isFinalizing}
           isCancelling={isCancelling}
           unclassifiedItemsCount={unclassifiedItems.length}
-          onBack={() => setShowBackConfirm(true)}
+          organizationSlug={organizationSlug}
           onCancel={() => setShowCancelConfirm(true)}
-          onSave={handleSave}
           onFinalize={handleFinalize}
         />
 
         <ReviewDialogs
-          showBackConfirm={showBackConfirm}
-          setShowBackConfirm={setShowBackConfirm}
           showCancelConfirm={showCancelConfirm}
           setShowCancelConfirm={setShowCancelConfirm}
           isCancelling={isCancelling}
-          onBack={handleBack}
           onCancelOrder={handleCancelOrder}
         />
 

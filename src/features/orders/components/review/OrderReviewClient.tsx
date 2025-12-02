@@ -51,6 +51,7 @@ export function OrderReviewClient({ orderId, initialData }: OrderReviewClientPro
         suppliers={serverData.suppliers}
         userRole={serverData.userRole}
         organizationId={serverData.order.organization_id}
+        organizationSlug={serverData.order.organization.slug}
       />
     );
   }

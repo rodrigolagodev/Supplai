@@ -15,6 +15,7 @@ interface OrderReviewBoardProps {
   suppliers: Supplier[];
   userRole: string;
   organizationId: string;
+  organizationSlug: string;
 }
 
 export function OrderReviewBoard({
@@ -23,14 +24,21 @@ export function OrderReviewBoard({
   suppliers: initialSuppliers,
   userRole,
   organizationId,
+  organizationSlug,
 }: OrderReviewBoardProps) {
   const orderReviewState = useOrderReview({
     orderId,
+    organizationSlug,
     initialItems,
     initialSuppliers,
   });
 
   return (
-    <OrderReviewView {...orderReviewState} organizationId={organizationId} userRole={userRole} />
+    <OrderReviewView
+      {...orderReviewState}
+      organizationId={organizationId}
+      organizationSlug={organizationSlug}
+      userRole={userRole}
+    />
   );
 }

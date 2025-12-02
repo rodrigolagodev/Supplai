@@ -21,11 +21,17 @@ type Supplier = Database['public']['Tables']['suppliers']['Row'];
 
 interface UseOrderReviewProps {
   orderId: string;
+  organizationSlug: string;
   initialItems: OrderItem[];
   initialSuppliers: Supplier[];
 }
 
-export function useOrderReview({ orderId, initialItems, initialSuppliers }: UseOrderReviewProps) {
+export function useOrderReview({
+  orderId,
+  organizationSlug,
+  initialItems,
+  initialSuppliers,
+}: UseOrderReviewProps) {
   const router = useRouter();
   const [items, setItems] = useState<OrderItem[]>(initialItems);
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
@@ -34,8 +40,7 @@ export function useOrderReview({ orderId, initialItems, initialSuppliers }: UseO
   const [isCancelling, setIsCancelling] = useState(false);
   const [showAllSuppliers, setShowAllSuppliers] = useState(false);
 
-  // Dialog states
-  const [showBackConfirm, setShowBackConfirm] = useState(false);
+  // Dialog state
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Sync state with props
@@ -178,18 +183,13 @@ export function useOrderReview({ orderId, initialItems, initialSuppliers }: UseO
     setIsCancelling(true);
     try {
       await cancelOrder(orderId);
-      toast.success('Pedido cancelado');
-      router.push('/orders');
+      toast.success('Pedido eliminado');
+      router.push(`/${organizationSlug}`);
     } catch {
-      toast.error('Error al cancelar pedido');
+      toast.error('Error al eliminar pedido');
       setIsCancelling(false);
       setShowCancelConfirm(false);
     }
-  };
-
-  const handleBack = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    router.push('/orders/new' as any);
   };
 
   const activeItem = activeId ? items.find(i => i.id === activeId) || null : null;
@@ -204,8 +204,6 @@ export function useOrderReview({ orderId, initialItems, initialSuppliers }: UseO
     isCancelling,
     showAllSuppliers,
     setShowAllSuppliers,
-    showBackConfirm,
-    setShowBackConfirm,
     showCancelConfirm,
     setShowCancelConfirm,
 
@@ -225,6 +223,5 @@ export function useOrderReview({ orderId, initialItems, initialSuppliers }: UseO
     handleSave,
     handleFinalize,
     handleCancelOrder,
-    handleBack,
   };
 }

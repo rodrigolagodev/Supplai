@@ -8,7 +8,7 @@ import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ProcessButton } from './ProcessButton';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { Database } from '@/types/database';
 import { ConnectionStatus } from './ConnectionStatus';
 
@@ -57,8 +57,8 @@ export function OrderChatInterface({
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
               <Link href={`/${organizationSlug}`}>
-                <X className="h-4 w-4 mr-1" />
-                Cancelar
+                <Save className="h-4 w-4 mr-1" />
+                Guardar y Salir
               </Link>
             </Button>
             <ProcessButton />

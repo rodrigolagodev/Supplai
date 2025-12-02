@@ -1,14 +1,13 @@
-import { Button } from '@/components/ui/button';
 import { TapButton } from '@/components/ui/motion-button';
-import { ArrowLeft, X, CheckCircle2 } from 'lucide-react';
+import { Trash2, CheckCircle2 } from 'lucide-react';
+import { AutoSaveIndicator } from './AutoSaveIndicator';
 
 interface ReviewHeaderProps {
   isFinalizing: boolean;
   isCancelling: boolean;
   unclassifiedItemsCount: number;
-  onBack: () => void;
+  organizationSlug: string;
   onCancel: () => void;
-  onSave: () => void;
   onFinalize: () => void;
 }
 
@@ -16,17 +15,13 @@ export function ReviewHeader({
   isFinalizing,
   isCancelling,
   unclassifiedItemsCount,
-  onBack,
+  organizationSlug,
   onCancel,
-  onSave,
   onFinalize,
 }: ReviewHeaderProps) {
   return (
     <div className="flex items-center justify-between">
-      <Button variant="ghost" onClick={onBack}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Volver
-      </Button>
+      <AutoSaveIndicator organizationSlug={organizationSlug} />
 
       <div className="hidden md:flex items-center gap-2">
         <TapButton
@@ -35,17 +30,14 @@ export function ReviewHeader({
           onClick={onCancel}
           disabled={isFinalizing || isCancelling}
         >
-          <X className="mr-2 h-4 w-4" />
-          Cancelar Pedido
-        </TapButton>
-        <TapButton variant="outline" onClick={onSave} disabled={isFinalizing || isCancelling}>
-          Guardar Cambios
+          <Trash2 className="mr-2 h-4 w-4" />
+          Eliminar Pedido
         </TapButton>
         <TapButton
           onClick={onFinalize}
           disabled={isFinalizing || isCancelling || unclassifiedItemsCount > 0}
         >
-          {isFinalizing ? 'Enviando...' : 'Enviar Pedido'}
+          {isFinalizing ? 'Enviando...' : 'Confirmar Pedido'}
           <CheckCircle2 className="ml-2 h-4 w-4" />
         </TapButton>
       </div>
