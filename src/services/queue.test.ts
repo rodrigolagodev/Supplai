@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { JobQueue } from './queue';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-interface MockSupabaseClient extends Partial<SupabaseClient> {
+interface MockSupabaseClient {
   auth: {
     getUser: ReturnType<typeof vi.fn>;
   };
@@ -36,7 +36,7 @@ describe('JobQueue', () => {
         insert: mockInsert,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSupabase.auth.getUser = vi.fn().mockResolvedValue({
         data: { user: { id: 'user-123' } },
       });
@@ -60,7 +60,7 @@ describe('JobQueue', () => {
         insert: mockInsert,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSupabase.auth.getUser = vi.fn().mockResolvedValue({
         data: { user: { id: 'user-123' } },
       });
@@ -76,7 +76,7 @@ describe('JobQueue', () => {
         insert: mockInsert,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSupabase.auth.getUser = vi.fn().mockResolvedValue({
         data: { user: null },
       });
@@ -120,7 +120,7 @@ describe('JobQueue', () => {
         return {};
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSelect.mockReturnValue({
         eq: mockEq,
       });
@@ -154,7 +154,7 @@ describe('JobQueue', () => {
         select: mockSelect,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSelect.mockReturnValue({ eq: mockEq });
       mockEq.mockReturnValue({ lt: mockLt });
       mockLt.mockReturnValue({ limit: mockLimit });
@@ -190,7 +190,7 @@ describe('JobQueue', () => {
         update: mockUpdate,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSelect.mockReturnValue({ eq: mockEq });
       mockEq.mockReturnValue({ lt: mockLt });
       mockLt.mockReturnValue({ limit: mockLimit });
@@ -219,7 +219,7 @@ describe('JobQueue', () => {
         select: mockSelect,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSelect.mockReturnValue({ eq: mockEq });
       mockEq.mockReturnValue({ lt: mockLt });
       mockLt.mockReturnValue({ limit: mockLimit });
@@ -254,7 +254,7 @@ describe('JobQueue', () => {
         update: mockUpdate,
       });
 
-      (mockSupabase as MockSupabaseClient).from = mockFrom;
+      (mockSupabase as unknown as MockSupabaseClient).from = mockFrom;
       mockSelect.mockReturnValue({ eq: mockEq });
       mockEq.mockReturnValue({ lt: mockLt });
       mockLt.mockReturnValue({ limit: mockLimit });

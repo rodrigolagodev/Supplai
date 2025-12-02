@@ -4,9 +4,10 @@ import React, { useRef, useEffect, memo } from 'react';
 import { useOrderChat } from '@/context/OrderChatContext';
 import { VoiceRecorderButton } from './VoiceRecorderButton';
 import { Button } from '@/components/ui/button';
-import { SendHorizontal, Check, Brain, WifiOff, Wifi } from 'lucide-react';
+import { SendHorizontal, Check, WifiOff, Wifi } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useSync } from '@/context/SyncContext';
+import { QuickReplies } from './QuickReplies';
 
 /**
  * ChatInput component with React.memo to prevent unnecessary re-renders
@@ -20,9 +21,11 @@ export const ChatInput = memo(function ChatInput() {
     processAudio,
     isLoading,
     orderId,
-    isWaitingForAI,
-    countdown,
     pendingCount,
+    sendMessage,
+    processOrder,
+    updateTypingActivity,
+    setIsRecording,
   } = useOrderChat();
   const { isOnline } = useSync();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -43,14 +46,28 @@ export const ChatInput = memo(function ChatInput() {
     }
   };
 
+  const handleQuickReply = (reply: { action: string; message?: string }) => {
+    if (reply.action === 'message' && reply.message) {
+      sendMessage(reply.message);
+    } else if (reply.action === 'finish') {
+      processOrder();
+    }
+  };
+
   return (
     <div className="p-4 bg-background border-t">
+      <div className="max-w-3xl mx-auto mb-2">
+        <QuickReplies onSelect={handleQuickReply} disabled={isLoading} />
+      </div>
       <div className="max-w-3xl mx-auto flex items-end gap-3">
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
             value={input}
-            onChange={handleInputChange}
+            onChange={e => {
+              handleInputChange(e);
+              updateTypingActivity();
+            }}
             onKeyDown={onKeyDown}
             placeholder="Escribe tu pedido o usa el micrófono..."
             className="min-h-[48px] max-h-[150px] resize-none pr-12 py-3 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary"
@@ -74,6 +91,7 @@ export const ChatInput = memo(function ChatInput() {
         <VoiceRecorderButton
           orderId={orderId}
           onRecordingComplete={processAudio}
+          onRecordingStateChange={setIsRecording}
           disabled={input.length > 0} // Disable voice if typing
         />
       </div>
@@ -95,21 +113,13 @@ export const ChatInput = memo(function ChatInput() {
           )}
 
           {/* Pending messages indicator */}
-          {pendingCount > 0 && !isWaitingForAI && (
+          {pendingCount > 0 && (
             <div className="flex items-center gap-1 text-muted-foreground">
               <Check className="h-3 w-3" />
               <span className="text-xs">
                 {pendingCount} mensaje{pendingCount > 1 ? 's' : ''} guardado
                 {pendingCount > 1 ? 's' : ''}
               </span>
-            </div>
-          )}
-
-          {/* AI waiting indicator */}
-          {isWaitingForAI && isOnline && (
-            <div className="flex items-center gap-1 text-blue-600">
-              <Brain className="h-3 w-3 animate-pulse" />
-              <span className="text-xs">IA procesará en {countdown}s...</span>
             </div>
           )}
         </div>

@@ -13,7 +13,8 @@ export function useLocalMessages(orderId: string) {
     content: string,
     role: MessageRole = 'user',
     type: MessageType = 'text',
-    audioBlob?: Blob
+    audioBlob?: Blob,
+    options?: { status?: 'pending' | 'synced' | 'failed' }
   ) => {
     // Get current max sequence number
     const allMessages = await db.messages.where('order_id').equals(orderId).toArray();
@@ -28,7 +29,7 @@ export function useLocalMessages(orderId: string) {
       audio_blob: audioBlob,
       created_at: new Date().toISOString(),
       sequence_number: maxSeq + 1,
-      sync_status: 'pending',
+      sync_status: options?.status || 'pending',
     };
 
     await db.messages.add(newMessage);

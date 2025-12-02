@@ -1,14 +1,15 @@
-import { google } from '@ai-sdk/google';
-import { streamText, CoreMessage } from 'ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/server';
 import { saveConversationMessage } from '@/features/orders/actions/process-message';
+import { CONVERSATIONAL_SYSTEM_PROMPT } from '@/lib/ai/prompts';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
 export async function POST(req: Request) {
   const body = await req.json();
-  console.log('[API] /api/chat body:', JSON.stringify(body, null, 2));
   const { messages, orderId } = body;
 
   const supabase = await createClient();
@@ -42,20 +43,11 @@ export async function POST(req: Request) {
     return new Response('Forbidden', { status: 403 });
   }
 
-  // Get the last user message to save it if needed (optimistic update handling)
-  // In a real app, you might want to check if it's already saved, but for now
-  // we assume the client sends the full history and we only persist the new interaction.
-  // However, `useChat` sends everything.
-  // Strategy: We will save the USER message and the ASSISTANT message in `onFinish`.
-  // But wait, `onFinish` only gives the generated text.
-  // We need to identify the NEW user message.
-  // Usually, the last message in `messages` array is the new user message.
   if (!messages || !Array.isArray(messages)) {
-    console.error('[API] Invalid messages format:', messages);
     return new Response('Invalid messages format', { status: 400 });
   }
 
-  const lastMessage = messages[messages.length - 1] as CoreMessage | undefined;
+  const lastMessage = messages[messages.length - 1];
 
   // Get the current max sequence number for proper ordering
   const { data: maxSeqData } = await supabase
@@ -68,48 +60,88 @@ export async function POST(req: Request) {
 
   const nextSeq = ((maxSeqData as { sequence_number?: number })?.sequence_number ?? -1) + 1;
 
-  // 1. Save User Message IMMEDIATELY (to prevent loss on abort)
-  if (
-    lastMessage &&
-    'role' in lastMessage &&
-    lastMessage.role === 'user' &&
-    'content' in lastMessage
-  ) {
-    try {
-      console.log('[API] Saving user message with seq:', nextSeq);
-      await saveConversationMessage(
-        orderId,
-        'user',
-        String(lastMessage.content),
-        undefined,
-        nextSeq
-      );
-    } catch (error) {
-      console.error('Failed to save user message:', error);
-      // We continue even if saving fails, but ideally we should alert
-    }
-  }
+  // Note: User messages are saved by the sync process from IndexedDB
+  // We only save the assistant response here
 
-  const result = await streamText({
-    model: google('gemini-1.5-flash'),
+  // Fetch product suggestions and last order for context
+  const {
+    getFrequentProducts,
+    getLastOrder,
+    formatFrequentProductsForPrompt,
+    formatLastOrderForPrompt,
+  } = await import('@/features/orders/server/services/product-suggestions');
 
-    messages: messages as CoreMessage[],
-    system: `Eres un asistente de pedidos para restaurantes. 
-    Tu objetivo es ayudar al usuario a crear una lista de productos para pedir a sus proveedores.
-    Sé conciso y directo. Si el usuario pide algo, confirma que lo has anotado.
-    Si el usuario envía un audio, asume que es una lista de productos.
-    NO proceses el pedido todavía, solo acumula la información conversacionalmente.`,
-    onFinish: async ({ text }) => {
-      // Save the interaction to the database asynchronously
+  const [frequentProducts, lastOrderItems] = await Promise.all([
+    getFrequentProducts(supabase, user.id, order.organization_id, 10),
+    getLastOrder(supabase, user.id, order.organization_id),
+  ]);
+
+  const frequentProductsContext = formatFrequentProductsForPrompt(frequentProducts);
+  const lastOrderContext = formatLastOrderForPrompt(lastOrderItems);
+
+  // Build enhanced system prompt with context
+  const enhancedSystemPrompt = `${CONVERSATIONAL_SYSTEM_PROMPT}
+
+PRODUCTOS FRECUENTES DEL USUARIO:
+${frequentProductsContext}
+
+ÚLTIMO PEDIDO DEL USUARIO:
+${lastOrderContext}
+
+INSTRUCCIONES ADICIONALES:
+- Si el usuario pregunta "¿qué suelo pedir?" o "mis productos habituales", menciona los productos frecuentes.
+- Si el usuario dice "lo mismo que la vez pasada" o "repetir último pedido", menciona los items del último pedido.
+- Cuando confirmes un producto, usa el formato: ✅ [cantidad] [unidad] de [producto]
+- Si el usuario menciona un producto sin cantidad o unidad, pregunta amablemente para aclarar.`;
+
+  // Convert messages to Google AI format
+  const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
+    role: m.role === 'user' ? 'user' : 'model',
+    parts: [{ text: m.content }],
+  }));
+
+  const model = genAI.getGenerativeModel({
+    model: 'models/gemini-2.0-flash',
+    generationConfig: {
+      temperature: 0.7,
+    },
+    systemInstruction: enhancedSystemPrompt,
+  });
+
+  const chat = model.startChat({ history });
+
+  // Stream the response
+  const result = await chat.sendMessageStream(String(lastMessage.content));
+
+  const encoder = new TextEncoder();
+  let fullResponse = '';
+
+  const stream = new ReadableStream({
+    async start(controller) {
       try {
-        // 2. Save Assistant Message
-        console.log('[API] Saving assistant message with seq:', nextSeq + 1);
-        await saveConversationMessage(orderId, 'assistant', text, undefined, nextSeq + 1);
+        for await (const chunk of result.stream) {
+          const text = chunk.text();
+          fullResponse += text;
+          controller.enqueue(encoder.encode(text));
+        }
+
+        // Save assistant message after streaming completes
+        try {
+          await saveConversationMessage(orderId, 'assistant', fullResponse, undefined, nextSeq + 1);
+        } catch (error) {
+          console.error('Failed to save assistant message:', error);
+        }
+
+        controller.close();
       } catch (error) {
-        console.error('Failed to save assistant message:', error);
+        controller.error(error);
       }
     },
   });
 
-  return result.toTextStreamResponse();
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+    },
+  });
 }

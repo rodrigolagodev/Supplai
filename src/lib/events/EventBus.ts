@@ -1,86 +1,47 @@
-/**
- * Simple in-memory Event Bus for event-driven patterns
- *
- * Purpose: Enable loose coupling between components without heavy infrastructure
- *
- * Use cases:
- * - Analytics tracking
- * - Audit logging
- * - Cross-component communication
- * - Future: Could be extended to persist events for Event Sourcing
- */
+export type ChatEvent =
+  | { type: 'message:sent'; payload: { messageId: string; content: string } }
+  | { type: 'message:received'; payload: { content: string } }
+  | { type: 'ai:typing'; payload: { isTyping: boolean } }
+  | { type: 'connection:changed'; payload: { isOnline: boolean } }
+  | { type: 'error:occurred'; payload: { error: Error; context: string } }
+  | { type: 'queue:status_changed'; payload: { pending: number; executing: number } };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type EventHandler<T = any> = (data: T) => void | Promise<void>;
+type EventHandler<T extends ChatEvent = ChatEvent> = (event: T) => void;
 
 export class EventBus {
-  private listeners = new Map<string, Set<EventHandler>>();
+  private subscribers = new Map<ChatEvent['type'], EventHandler[]>();
 
-  /**
-   * Subscribe to an event
-   * @param event - Event name to listen to
-   * @param handler - Function to call when event is emitted
-   * @returns Unsubscribe function
-   */
-  on<T = unknown>(event: string, handler: EventHandler<T>): () => void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
+  subscribe<T extends ChatEvent['type']>(
+    eventType: T,
+    handler: EventHandler<Extract<ChatEvent, { type: T }>>
+  ): () => void {
+    if (!this.subscribers.has(eventType)) {
+      this.subscribers.set(eventType, []);
     }
 
-    this.listeners.get(event)!.add(handler as EventHandler);
+    this.subscribers.get(eventType)!.push(handler as EventHandler);
 
     // Return unsubscribe function
     return () => {
-      this.listeners.get(event)?.delete(handler as EventHandler);
+      const handlers = this.subscribers.get(eventType);
+      if (handlers) {
+        const index = handlers.indexOf(handler as EventHandler);
+        if (index > -1) {
+          handlers.splice(index, 1);
+        }
+      }
     };
   }
 
-  /**
-   * Emit an event to all subscribers
-   * @param event - Event name to emit
-   * @param data - Data to pass to handlers
-   */
-  emit<T = unknown>(event: string, data: T): void {
-    const handlers = this.listeners.get(event);
-    if (!handlers) return;
-
+  publish(event: ChatEvent): void {
+    const handlers = this.subscribers.get(event.type) ?? [];
     handlers.forEach(handler => {
       try {
-        // Fire-and-forget: Don't await async handlers to avoid blocking
-        const result = handler(data);
-
-        // If it's a promise and it rejects, log the error but don't throw
-        if (result instanceof Promise) {
-          result.catch(error => {
-            console.error(`Event handler error for ${event}:`, error);
-          });
-        }
+        handler(event);
       } catch (error) {
-        console.error(`Event handler error for ${event}:`, error);
+        console.error(`Error in event handler for ${event.type}:`, error);
       }
     });
-  }
-
-  /**
-   * Remove all listeners for an event
-   * @param event - Event name to clear
-   */
-  clear(event: string): void {
-    this.listeners.delete(event);
-  }
-
-  /**
-   * Remove all listeners for all events
-   */
-  clearAll(): void {
-    this.listeners.clear();
-  }
-
-  /**
-   * Get count of listeners for an event (useful for testing)
-   */
-  listenerCount(event: string): number {
-    return this.listeners.get(event)?.size ?? 0;
   }
 }
 

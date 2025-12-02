@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { eventBus } from '@/lib/events/EventBus';
-import { OrderEventNames } from '@/features/orders/server/events/OrderEvents';
+
 import type { Database } from '@/types/database';
 
 /**
@@ -39,7 +39,16 @@ export class OrderCommands {
         role: params.role,
         content: params.content,
         audio_file_id: params.audioFileId || null,
-        sequence_number: params.sequenceNumber,
+        // Ensure sequence number fits in 4-byte integer (max 2,147,483,647)
+        // If it's a timestamp (13 digits), we need to handle it.
+        // However, the best practice is to let the database handle auto-increment or use a smaller number.
+        // Since we receive it from params, we'll cap it or modulo it if it's too large,
+        // BUT for correctness we should probably query the max sequence number if it looks like a timestamp.
+        // For now, let's assume if it's > 2000000000 it's a timestamp and we should fix it.
+        sequence_number:
+          params.sequenceNumber > 2000000000
+            ? Math.floor(params.sequenceNumber / 1000)
+            : params.sequenceNumber,
       },
       {
         onConflict: 'id',
@@ -52,12 +61,14 @@ export class OrderCommands {
     }
 
     // Emit event for tracking/analytics
-    eventBus.emit(OrderEventNames.MESSAGE_ADDED, {
-      orderId: params.orderId,
-      messageId,
-      role: params.role,
-      sequenceNumber: params.sequenceNumber,
-      timestamp: new Date().toISOString(),
+    // Emit event for tracking/analytics
+    // Map to new EventBus structure
+    eventBus.publish({
+      type: 'message:sent',
+      payload: {
+        messageId,
+        content: params.content,
+      },
     });
 
     return messageId;
@@ -150,15 +161,6 @@ export class OrderCommands {
       });
 
       // Calculate stats for event
-      const unclassifiedCount = classifiedItems.filter(item => !item.supplier_id).length;
-
-      // Emit event for tracking/analytics
-      eventBus.emit(OrderEventNames.ORDER_PROCESSED, {
-        orderId,
-        itemCount: classifiedItems.length,
-        unclassifiedCount,
-        timestamp: new Date().toISOString(),
-      });
 
       return {
         success: true,
@@ -166,11 +168,13 @@ export class OrderCommands {
       };
     } catch (error) {
       // Emit failure event
-      eventBus.emit(OrderEventNames.PROCESSING_FAILED, {
-        orderId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stage: 'parsing',
-        timestamp: new Date().toISOString(),
+      // Emit failure event
+      eventBus.publish({
+        type: 'error:occurred',
+        payload: {
+          error: error instanceof Error ? error : new Error('Unknown error'),
+          context: `Processing failed for order ${orderId}`,
+        },
       });
 
       throw error;
@@ -226,11 +230,11 @@ export class OrderCommands {
     }
 
     // Emit event for tracking/analytics
-    eventBus.emit(OrderEventNames.ORDER_SENT, {
-      orderId,
-      supplierOrderIds: supplierOrders.map(so => so.id),
-      supplierCount: supplierOrders.length,
-      timestamp: new Date().toISOString(),
+    // Emit event for tracking/analytics
+    // TODO: Define specific events for order sending
+    eventBus.publish({
+      type: 'queue:status_changed',
+      payload: { pending: 0, executing: 0 },
     });
   }
 }

@@ -6,9 +6,12 @@ import { cn } from '@/lib/utils';
 import { Bot, User, CheckCheck, Clock } from 'lucide-react';
 import { AudioMessage } from './AudioMessage';
 import { LocalMessage } from '@/lib/db/schema';
+import { TypingIndicator } from './TypingIndicator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { motion } from 'framer-motion';
 
 export function MessageList() {
-  const { messages, isLoading, currentStatus } = useOrderChat();
+  const { messages, isLoading, currentStatus, isAssistantTyping } = useOrderChat();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -33,23 +36,29 @@ export function MessageList() {
             <MessageItem key={msg.id} message={msg} />
           ))}
 
-          {isLoading && (
+          {(isLoading || isAssistantTyping) && (
             <div className="flex w-full gap-3 max-w-3xl mx-auto justify-start">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Bot className="h-5 w-5 text-primary" />
-              </div>
-              <div className="bg-muted rounded-2xl rounded-bl-none px-4 py-3 flex items-center gap-2">
-                <span className="flex gap-1">
-                  <span className="h-2 w-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="h-2 w-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="h-2 w-2 bg-muted-foreground/60 rounded-full animate-bounce"></span>
-                </span>
-                <span className="text-xs text-muted-foreground ml-2 capitalize">
-                  {currentStatus === 'transcribing' && 'Transcribiendo audio...'}
-                  {currentStatus === 'parsing' && 'Escribiendo...'}
-                  {currentStatus === 'classifying' && 'Buscando proveedores...'}
-                </span>
-              </div>
+              <Avatar className="h-8 w-8 border">
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  <Bot className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+              {isAssistantTyping ? (
+                <TypingIndicator />
+              ) : (
+                <div className="bg-muted rounded-2xl rounded-bl-none px-4 py-3 flex items-center gap-2">
+                  <span className="flex gap-1">
+                    <span className="h-2 w-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="h-2 w-2 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="h-2 w-2 bg-muted-foreground/60 rounded-full animate-bounce"></span>
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-2 capitalize">
+                    {currentStatus === 'transcribing' && 'Transcribiendo audio...'}
+                    {currentStatus === 'parsing' && 'Escribiendo...'}
+                    {currentStatus === 'classifying' && 'Buscando proveedores...'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -66,25 +75,30 @@ function MessageItem({ message }: { message: LocalMessage }) {
   const isAudio = message.type === 'audio';
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       className={cn(
         'flex w-full gap-3 max-w-3xl mx-auto',
         isUser ? 'justify-end' : 'justify-start'
       )}
     >
       {isAssistant && (
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-          <Bot className="h-5 w-5 text-primary" />
-        </div>
+        <Avatar className="h-8 w-8 border">
+          <AvatarImage src="/bot-avatar.png" alt="AI" />
+          <AvatarFallback className="bg-primary/10 text-primary">
+            <Bot className="h-4 w-4" />
+          </AvatarFallback>
+        </Avatar>
       )}
 
       <div className="flex flex-col gap-1 max-w-[80%]">
         <div
           className={cn(
-            'rounded-2xl overflow-hidden',
+            'rounded-2xl overflow-hidden shadow-sm',
             isUser
               ? 'bg-primary text-primary-foreground rounded-br-none'
-              : 'bg-muted text-foreground rounded-bl-none'
+              : 'bg-card border text-card-foreground rounded-bl-none'
           )}
         >
           {/* Render audio message */}
@@ -96,7 +110,6 @@ function MessageItem({ message }: { message: LocalMessage }) {
                 syncStatus={message.sync_status}
                 className="bg-primary/20"
               />
-              {/* No mostramos la transcripción del lado del usuario */}
             </div>
           ) : (
             <div className="px-4 py-3">
@@ -130,11 +143,14 @@ function MessageItem({ message }: { message: LocalMessage }) {
       </div>
 
       {isUser && (
-        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-          <User className="h-5 w-5 text-primary-foreground" />
-        </div>
+        <Avatar className="h-8 w-8 border">
+          <AvatarImage src="/user-avatar.png" alt="User" />
+          <AvatarFallback className="bg-primary text-primary-foreground">
+            <User className="h-4 w-4" />
+          </AvatarFallback>
+        </Avatar>
       )}
-    </div>
+    </motion.div>
   );
 }
 

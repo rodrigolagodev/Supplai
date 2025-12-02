@@ -10,6 +10,7 @@ import { ProcessButton } from './ProcessButton';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Database } from '@/types/database';
+import { ConnectionStatus } from './ConnectionStatus';
 
 type Message = Database['public']['Tables']['order_conversations']['Row'];
 
@@ -51,6 +52,7 @@ export function OrderChatInterface({
             <p className="text-sm text-muted-foreground">
               Graba o escribe los productos que necesitas
             </p>
+            <ConnectionStatus />
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>

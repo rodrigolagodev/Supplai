@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+
 import { useAudioTranscription } from '@/hooks/useAudioTranscription';
 import { Mic, Square, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,12 +11,14 @@ interface VoiceRecorderButtonProps {
   orderId: string;
   onRecordingComplete: (audioBlob: Blob) => void;
   disabled?: boolean;
+  onRecordingStateChange?: (isRecording: boolean) => void;
 }
 
 export function VoiceRecorderButton({
   orderId,
   onRecordingComplete,
   disabled = false,
+  onRecordingStateChange,
 }: VoiceRecorderButtonProps) {
   const {
     state,
@@ -36,6 +40,13 @@ export function VoiceRecorderButton({
       console.error('Audio recording error:', error);
     },
   });
+
+  // Notify parent when recording state changes
+  useEffect(() => {
+    if (onRecordingStateChange) {
+      onRecordingStateChange(isRecording);
+    }
+  }, [isRecording, onRecordingStateChange]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
