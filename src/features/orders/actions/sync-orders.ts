@@ -41,23 +41,23 @@ export async function cleanupEmptyDrafts(
     const deletedIds: string[] = [];
     const errors: string[] = [];
 
-    // Check each draft for messages and delete if empty
+    // Check each draft for items and delete if empty
     for (const draft of oldDrafts) {
       try {
-        // Check if order has any messages
-        const { data: messages, error: msgError } = await supabaseAdmin
-          .from('order_conversations')
+        // Check if order has any items
+        const { data: items, error: itemsError } = await supabaseAdmin
+          .from('order_items')
           .select('id')
           .eq('order_id', draft.id)
           .limit(1);
 
-        if (msgError) {
-          errors.push(`Error checking messages for order ${draft.id}: ${msgError.message}`);
+        if (itemsError) {
+          errors.push(`Error checking items for order ${draft.id}: ${itemsError.message}`);
           continue;
         }
 
-        // If no messages, delete the order
-        if (!messages || messages.length === 0) {
+        // If no items, delete the order (conversation history is not valuable without items)
+        if (!items || items.length === 0) {
           const { error: deleteError } = await supabaseAdmin
             .from('orders')
             .delete()

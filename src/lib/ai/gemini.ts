@@ -155,7 +155,6 @@ export async function parseOrderText(
       const jsonResponse = JSON.parse(textResponse);
 
       // Debug: Log the raw response
-      console.log('[Gemini] Raw JSON response:', JSON.stringify(jsonResponse, null, 2));
 
       // Validate with Zod
       try {

@@ -139,11 +139,20 @@ export async function deleteOrderItem(itemId: string) {
   return { success: true };
 }
 
+export interface OrderReviewItem {
+  id: string;
+  supplier_id: string | null;
+  product: string;
+  quantity: number;
+  unit: string;
+  confidence_score?: number | null;
+  original_text?: string | null;
+}
+
 /**
  * Save all order items in batch
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function saveOrderItems(orderId: string, items: any[]) {
+export async function saveOrderItems(orderId: string, items: OrderReviewItem[]) {
   const { supabase } = await getOrderContext(orderId);
 
   // Separate new items from existing items

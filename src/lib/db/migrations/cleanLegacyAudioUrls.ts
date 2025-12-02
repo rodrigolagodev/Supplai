@@ -1,4 +1,5 @@
 import { db } from '../index';
+/* eslint-disable no-console */
 import { createClient } from '@/lib/supabase/client';
 
 /**

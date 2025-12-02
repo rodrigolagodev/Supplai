@@ -1,27 +1,34 @@
 'use server';
 
 import { getOrderContext } from '@/lib/auth/context';
-import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { saveOrderItems } from '@/features/orders/actions/items';
 
 /**
  * Send an order to suppliers
+ *
+ * This is now a thin controller that delegates to SubmitOrderUseCase
  */
-export async function sendOrder(orderId: string) {
-  const { supabase, order } = await getOrderContext(orderId);
+export async function sendOrder(orderId: string, redirectPath?: string) {
+  const { supabase } = await getOrderContext(orderId);
 
-  // Verify status
-  if (order.status !== 'draft' && order.status !== 'review') {
-    throw new Error('Order can only be sent from draft or review status');
+  // Delegate to use case
+  const { submitOrderUseCase } = await import('@/application/use-cases/SubmitOrder');
+
+  const result = await submitOrderUseCase({
+    orderId,
+    supabase,
+  });
+
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to send order');
   }
 
-  // 2. Use command pattern to execute business logic
-  const { OrderCommands } = await import('@/features/orders/server/services/order-commands');
-  const commands = new OrderCommands(supabase);
-
-  await commands.sendOrder(orderId);
-
-  revalidatePath(`/orders/${orderId}`);
+  // Redirect after successful submission
+  if (redirectPath) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    redirect(redirectPath as any);
+  }
 
   return { success: true };
 }
@@ -29,8 +36,12 @@ export async function sendOrder(orderId: string) {
 /**
  * Finalize order and mark as ready to send
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function finalizeOrder(orderId: string, items: any[]) {
+import type { OrderReviewItem } from '@/features/orders/actions/items';
+
+/**
+ * Finalize order and mark as ready to send
+ */
+export async function finalizeOrder(orderId: string, items: OrderReviewItem[]) {
   // Verify access to order first
   await getOrderContext(orderId);
 

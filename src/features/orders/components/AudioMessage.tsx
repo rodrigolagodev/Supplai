@@ -49,7 +49,6 @@ export function AudioMessage({
   useEffect(() => {
     // Skip if we have blob - blob URL is already available
     if (audioBlob) {
-      console.log('[AudioMessage] Skipping public URL fetch - using local blob');
       return;
     }
 
@@ -68,7 +67,7 @@ export function AudioMessage({
       }
 
       // audioUrl is a UUID (audio_file_id)
-      console.log('[AudioMessage] No blob available, fetching public URL for UUID:', audioUrl);
+
       setIsLoadingUrl(true);
 
       try {
@@ -89,7 +88,6 @@ export function AudioMessage({
         const { data } = supabase.storage.from('orders').getPublicUrl(audioFile.storage_path);
 
         if (data?.publicUrl) {
-          console.log('[AudioMessage] Fetched public URL:', data.publicUrl);
           setPublicUrl(data.publicUrl);
         } else {
           setPublicUrl(undefined);
@@ -113,11 +111,6 @@ export function AudioMessage({
   const prevSrcRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (prevSrcRef.current !== src) {
-      console.log('[AudioMessage] Audio source changed:', {
-        from: prevSrcRef.current || 'none',
-        to: src || 'none',
-        audioBlob: audioBlob ? 'present' : 'none',
-      });
       prevSrcRef.current = src;
     }
   }, [src, audioBlob]);
@@ -131,14 +124,11 @@ export function AudioMessage({
       return;
     }
 
-    console.log('[AudioMessage] Attempting to play audio from:', src);
-
     if (isPlaying) {
       audioRef.current.pause();
     } else {
       try {
         await audioRef.current.play();
-        console.log('[AudioMessage] Playback started successfully');
       } catch (error) {
         console.error('[AudioMessage] Error playing audio:', error);
         // Reset on error

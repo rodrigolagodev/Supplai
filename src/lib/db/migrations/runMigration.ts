@@ -9,6 +9,8 @@
  */
 
 import { cleanLegacyAudioUrls } from './cleanLegacyAudioUrls';
+/* eslint-disable no-console */
+
 import { db } from '../index';
 
 /**

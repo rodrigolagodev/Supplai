@@ -5,6 +5,9 @@ import { getOrderContext } from '@/lib/auth/context';
 /**
  * Save a message to the conversation history
  */
+/**
+ * Save a message to the conversation history
+ */
 export async function saveConversationMessage(
   orderId: string,
   role: 'user' | 'assistant',
@@ -16,18 +19,30 @@ export async function saveConversationMessage(
   // We use getOrderContext to verify access to the order
   const { supabase } = await getOrderContext(orderId);
 
-  // Use command pattern to execute business logic
-  const { OrderCommands } = await import('@/features/orders/server/services/order-commands');
-  const commands = new OrderCommands(supabase);
+  const messageId = id || crypto.randomUUID();
+  const seqNum = sequenceNumber || 0;
 
-  await commands.addMessage({
-    orderId,
-    role,
-    content,
-    audioFileId,
-    sequenceNumber: sequenceNumber || 0,
-    id,
-  });
+  // Handle sequence number overflow (legacy support)
+  const safeSequenceNumber = seqNum > 2000000000 ? Math.floor(seqNum / 1000) : seqNum;
+
+  const { error } = await supabase.from('order_conversations').upsert(
+    {
+      id: messageId,
+      order_id: orderId,
+      role,
+      content,
+      audio_file_id: audioFileId || null,
+      sequence_number: safeSequenceNumber,
+    },
+    {
+      onConflict: 'id',
+      ignoreDuplicates: false,
+    }
+  );
+
+  if (error) {
+    throw new Error(`Failed to add message: ${error.message}`);
+  }
 }
 
 /**
@@ -48,8 +63,10 @@ export async function processBatchMessages(orderId: string) {
     .limit(1)
     .maybeSingle();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lastAssistantSeq = (lastAssistantMsg as any)?.sequence_number ?? -1;
+  // Temporary type fix until database types are regenerated
+  type OrderConversationWithSequence = { sequence_number: number };
+  const lastAssistantSeq =
+    (lastAssistantMsg as unknown as OrderConversationWithSequence)?.sequence_number ?? -1;
 
   // 3. Get all user messages after the last assistant message
   const { data: messages } = await supabase
@@ -111,18 +128,20 @@ export async function processBatchMessages(orderId: string) {
 
 /**
  * Process all messages in an order to extract items
- * - Fetches all user messages
- * - Aggregates text
- * - Parses with Gemini
- * - Classifies with Suppliers
- * - Replaces existing items
+ *
+ * This is now a thin controller that delegates to ProcessOrderMessageUseCase
  */
 export async function processOrderBatch(orderId: string) {
   const { supabase, order } = await getOrderContext(orderId);
 
-  // 2. Use command pattern to execute business logic
-  const { OrderCommands } = await import('@/features/orders/server/services/order-commands');
-  const commands = new OrderCommands(supabase);
+  // Delegate to use case
+  const { processOrderMessageUseCase } = await import(
+    '@/application/use-cases/ProcessOrderMessage'
+  );
 
-  return await commands.processOrder(orderId, order.organization_id);
+  return await processOrderMessageUseCase({
+    orderId,
+    organizationId: order.organization_id,
+    supabase,
+  });
 }

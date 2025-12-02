@@ -1,17 +1,9 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, useMemo } from 'react';
 import { ConversationStateMachine, ConversationEvent } from '@/lib/state/ConversationStateMachine';
 
-let stateMachine: ConversationStateMachine | null = null;
-
-function getStateMachine() {
-  if (!stateMachine) {
-    stateMachine = new ConversationStateMachine();
-  }
-  return stateMachine;
-}
-
 export function useConversationState() {
-  const machine = getStateMachine();
+  // Create a new instance per component usage (scoped to the component lifecycle)
+  const machine = useMemo(() => new ConversationStateMachine(), []);
 
   const state = useSyncExternalStore(
     callback => machine.subscribe(callback),
@@ -23,5 +15,5 @@ export function useConversationState() {
     machine.transition(event);
   };
 
-  return { state, dispatch };
+  return { state, dispatch, machine };
 }

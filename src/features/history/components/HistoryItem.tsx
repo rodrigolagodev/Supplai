@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import Image from 'next/image';
 
 import { toast } from 'sonner';
 import { LiveOrderStatusBadge } from '@/components/orders/LiveOrderStatusBadge';
@@ -112,10 +113,13 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
 
           <div className="hidden md:flex items-center gap-2">
             {item.createdBy.avatarUrl ? (
-              <img
+              <Image
                 src={item.createdBy.avatarUrl}
                 alt={item.createdBy.name}
                 className="h-6 w-6 rounded-full object-cover"
+                width={24}
+                height={24}
+                unoptimized
               />
             ) : (
               <div className="h-6 w-6 rounded-full bg-stone-200 flex items-center justify-center">
