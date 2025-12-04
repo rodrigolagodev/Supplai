@@ -44,7 +44,13 @@ const statusConfig: Record<string, { label: string; color: string; icon: LucideI
   archived: { label: 'Archivado', color: 'bg-stone-100 text-stone-400', icon: Archive },
 };
 
-export function HistoryItem({ item }: { item: HistoryItemType }) {
+export function HistoryItem({
+  item,
+  organizationSlug,
+}: {
+  item: HistoryItemType;
+  organizationSlug: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
@@ -77,10 +83,10 @@ export function HistoryItem({ item }: { item: HistoryItemType }) {
 
   const detailsHref = (
     item.type === 'supplier_order'
-      ? `/orders/${item.id}/details`
+      ? `/${organizationSlug}/orders/${item.id}/details`
       : item.status === 'review'
-        ? `/orders/${item.originalOrderId}/review`
-        : `/orders/${item.originalOrderId}`
+        ? `/${organizationSlug}/orders/${item.originalOrderId}/review`
+        : `/${organizationSlug}/orders/${item.originalOrderId}`
   ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   return (

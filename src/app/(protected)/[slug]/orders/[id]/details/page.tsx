@@ -4,12 +4,13 @@ import { redirect, notFound } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{
+    slug: string;
     id: string;
   }>;
 }
 
 export default async function OrderDetailsPage({ params }: PageProps) {
-  const { id } = await params;
+  const { slug, id } = await params;
 
   try {
     const result = await getOrderDetails(id);
@@ -22,10 +23,10 @@ export default async function OrderDetailsPage({ params }: PageProps) {
     // If order is not sent or archived, redirect to appropriate page
     if (order.status === 'draft') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      redirect(`/orders/${id}` as any);
+      redirect(`/${slug}/orders/${id}` as any);
     } else if (order.status === 'review') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      redirect(`/orders/${id}/review` as any);
+      redirect(`/${slug}/orders/${id}/review` as any);
     }
 
     // Dynamic title and description based on order type

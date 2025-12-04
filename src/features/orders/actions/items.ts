@@ -30,7 +30,11 @@ export async function saveParsedItems(orderId: string, items: ClassifiedItem[]) 
     throw new Error('Failed to save items');
   }
 
-  revalidatePath(`/orders/${orderId}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orgSlug =
+    (supabase as any).organization?.slug ||
+    (await getOrderContext(orderId)).order.organization?.slug;
+  revalidatePath(`/${orgSlug}/orders/${orderId}`);
 }
 
 /**
@@ -101,9 +105,14 @@ export async function reassignItem(itemId: string, supplierId: string | null) {
     throw new Error(`Error al reasignar item: ${error.message}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orgSlug =
+    (item as any).order?.organization?.slug ||
+    (await getOrderContext(item.order_id)).order.organization?.slug;
+
   // Revalidate
-  revalidatePath(`/orders/${item.order_id}`);
-  revalidatePath(`/orders/${item.order_id}/review`);
+  revalidatePath(`/${orgSlug}/orders/${item.order_id}`);
+  revalidatePath(`/${orgSlug}/orders/${item.order_id}/review`);
 
   return { success: true };
 }
@@ -134,7 +143,11 @@ export async function deleteOrderItem(itemId: string) {
   }
 
   if (item) {
-    revalidatePath(`/orders/${item.order_id}/review`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orgSlug =
+      (item as any).order?.organization?.slug ||
+      (await getOrderContext(item.order_id)).order.organization?.slug;
+    revalidatePath(`/${orgSlug}/orders/${item.order_id}/review`);
   }
   return { success: true };
 }
@@ -223,7 +236,8 @@ export async function saveOrderItems(orderId: string, items: OrderReviewItem[]) 
     }
   }
 
-  revalidatePath(`/orders/${orderId}/review`);
+  const orgSlug = (await getOrderContext(orderId)).order.organization?.slug;
+  revalidatePath(`/${orgSlug}/orders/${orderId}/review`);
   return { success: true };
 }
 
@@ -255,6 +269,7 @@ export async function createOrderItem(
     throw new Error('Error al crear producto');
   }
 
-  revalidatePath(`/orders/${orderId}/review`);
+  const orgSlug = (await getOrderContext(orderId)).order.organization?.slug;
+  revalidatePath(`/${orgSlug}/orders/${orderId}/review`);
   return newItem;
 }

@@ -95,7 +95,11 @@ export async function getOrderContext(orderId: string) {
     throw new Error('Unauthorized');
   }
 
-  const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+  const { data: order } = await supabase
+    .from('orders')
+    .select('*, organization:organizations(slug)')
+    .eq('id', orderId)
+    .single();
 
   if (!order) {
     throw new Error('Order not found');

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useLocalMessages } from '@/features/orders/hooks/useLocalMessages';
 import { useLocalOrder } from '@/features/orders/hooks/useLocalOrder';
+import { syncOrder } from '@/lib/db/sync';
 import { useSync } from '@/context/SyncContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useConversationState } from '@/hooks/useConversationState';
@@ -258,31 +259,85 @@ export function useOrderChatLogic({
   const processOrder = useCallback(async () => {
     setIsProcessing(true);
     try {
-      await updateStatus('review');
+      // REMOVED: await updateStatus('review');
+      // We don't want to set review status until we are sure processing succeeded.
 
       if (isOnline) {
         toast.info('Sincronizando y procesando...');
-        await syncNow();
+
+        try {
+          // Force sync the order first to ensure it exists on Supabase
+          await syncOrder(orderId);
+          // Also trigger general sync for messages
+          await syncNow();
+
+          // Double check that we don't have pending messages locally
+          // This is critical: if we have pending messages, the server won't see them
+          const currentPending = messages?.filter(m => m.sync_status === 'pending');
+          if (currentPending && currentPending.length > 0) {
+            // Try one more time with a small delay
+            console.warn(
+              `[ProcessOrder] Found ${currentPending.length} pending messages, retrying sync...`
+            );
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            await syncNow();
+
+            // Check again after retry
+            const retryPending = messages?.filter(m => m.sync_status === 'pending');
+            if (retryPending && retryPending.length > 0) {
+              // Instead of failing, just log a warning and continue
+              // The server will process whatever messages it has
+              console.warn(
+                `[ProcessOrder] Still ${retryPending.length} pending messages after retry, proceeding anyway`
+              );
+            }
+          }
+        } catch (syncError) {
+          console.error('Sync failed before processing:', syncError);
+          toast.error('Error de sincronización. Verifica tu conexión.');
+          setIsProcessing(false);
+          return;
+        }
 
         try {
           // Use the new Use Case via Server Action
+          console.log('[ProcessOrder] Calling processOrderBatch for order:', orderId);
           const { processOrderBatch } = await import('@/features/orders/actions/process-message');
           const result = await processOrderBatch(orderId);
 
+          console.log('[ProcessOrder] Result from processOrderBatch:', result);
+
           if (result.success && result.redirectUrl && onOrderProcessed) {
+            console.log(
+              '[ProcessOrder] Success! Updating status and redirecting to:',
+              result.redirectUrl
+            );
+            // SUCCESS! Now we update the local status to match server
+            await updateStatus('review');
             onOrderProcessed(result.redirectUrl);
             return; // Exit early if redirecting
           }
 
           if (!result.success) {
+            console.error('[ProcessOrder] Processing failed:', result.message);
             toast.error(result.message || 'Error al procesar el pedido');
+            // Do NOT update status to review if failed
+          } else {
+            console.warn('[ProcessOrder] Success but missing redirect info:', {
+              hasRedirectUrl: !!result.redirectUrl,
+              hasCallback: !!onOrderProcessed,
+            });
           }
         } catch (e) {
           console.error('Error triggering batch process:', e);
           toast.error('Error al procesar el pedido');
         }
       } else {
+        // Offline mode
         toast.info('Guardado localmente. Se procesará al conectar.');
+        // In offline mode, we DO update status because we want to show the "Waiting for connection" screen
+        await updateStatus('review');
+
         if (onOrderProcessed) {
           onOrderProcessed(`/${organizationSlug}/orders/${orderId}/review`);
         }
@@ -293,7 +348,7 @@ export function useOrderChatLogic({
     } finally {
       setIsProcessing(false);
     }
-  }, [orderId, onOrderProcessed, isOnline, syncNow, updateStatus]);
+  }, [orderId, onOrderProcessed, isOnline, syncNow, updateStatus, messages, organizationSlug]);
 
   const pendingCount = useMemo(() => {
     return messages?.filter(m => m.sync_status === 'pending').length || 0;

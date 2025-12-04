@@ -6,12 +6,13 @@ import { getOrderConversation } from '@/features/orders/queries/get-order';
 
 interface PageProps {
   params: Promise<{
+    slug: string;
     id: string;
   }>;
 }
 
 export default async function EditOrderPage({ params }: PageProps) {
-  const { id } = await params;
+  const { slug, id } = await params;
   const supabase = await createClient();
   const {
     data: { user },
@@ -38,15 +39,16 @@ export default async function EditOrderPage({ params }: PageProps) {
 
     if (supplierOrder) {
       // Supplier orders can't be edited, redirect to details
-      redirect(`/orders/${id}/details` as any);
+      redirect(`/${slug}/orders/${id}/details` as any);
     }
 
     // If neither found, it MIGHT be a local-only draft.
-    // We check if the user has an organization to contextually bind this order to.
+    // We check if the user has access to the organization from the URL
     const { data: membership } = await supabase
       .from('memberships')
       .select('organization_id, organization:organizations(slug)')
       .eq('user_id', user.id)
+      .eq('organization.slug', slug)
       .limit(1)
       .single();
 
@@ -60,7 +62,7 @@ export default async function EditOrderPage({ params }: PageProps) {
       <OrderChatInterface
         orderId={id}
         initialMessages={[]}
-        organizationSlug={membership.organization?.slug || ''}
+        organizationSlug={slug}
         organizationId={membership.organization_id}
       />
     );
@@ -68,9 +70,9 @@ export default async function EditOrderPage({ params }: PageProps) {
 
   // If order is not in draft status, redirect to review or confirmation
   if (order.status === 'review') {
-    redirect(`/orders/${id}/review`);
+    redirect(`/${slug}/orders/${id}/review`);
   } else if (order.status === 'sent' || order.status === 'archived') {
-    redirect(`/orders/${id}/confirmation` as any);
+    redirect(`/${slug}/orders/${id}/confirmation` as any);
   }
 
   // Fetch conversation history
@@ -80,7 +82,7 @@ export default async function EditOrderPage({ params }: PageProps) {
     <OrderChatInterface
       orderId={id}
       initialMessages={messages}
-      organizationSlug={order.organization?.slug || ''}
+      organizationSlug={slug}
       organizationId={order.organization_id}
     />
   );

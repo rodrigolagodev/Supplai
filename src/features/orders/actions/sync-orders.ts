@@ -32,11 +32,11 @@ export async function cleanupEmptyDrafts(
     }
 
     if (!oldDrafts || oldDrafts.length === 0) {
-      console.error('[Cleanup] No old draft orders found');
+      console.log('[Cleanup] No old draft orders found');
       return { deletedCount: 0, errors: [] };
     }
 
-    console.error(`[Cleanup] Found ${oldDrafts.length} old draft orders`);
+    console.log(`[Cleanup] Found ${oldDrafts.length} old draft orders`);
 
     const deletedIds: string[] = [];
     const errors: string[] = [];
@@ -75,7 +75,7 @@ export async function cleanupEmptyDrafts(
       }
     }
 
-    console.error(`[Cleanup] Deleted ${deletedIds.length} empty draft orders`);
+    console.log(`[Cleanup] Deleted ${deletedIds.length} empty draft orders`);
     if (errors.length > 0) {
       console.error('[Cleanup] Errors during cleanup:', errors);
     }

@@ -19,9 +19,10 @@ interface RecentOrder {
 
 interface RecentActivityListProps {
   orders: RecentOrder[];
+  organizationSlug: string;
 }
 
-export function RecentActivityList({ orders }: RecentActivityListProps) {
+export function RecentActivityList({ orders, organizationSlug }: RecentActivityListProps) {
   if (!orders || orders.length === 0) {
     return (
       <div className="p-6 text-center text-sm text-gray-500">
@@ -62,10 +63,10 @@ export function RecentActivityList({ orders }: RecentActivityListProps) {
               <Link
                 href={
                   item.type === 'supplier_order'
-                    ? `/orders/${item.id}/details`
+                    ? `/${organizationSlug}/orders/${item.id}/details`
                     : item.status === 'review'
-                      ? `/orders/${item.id}/review`
-                      : `/orders/${item.id}`
+                      ? `/${organizationSlug}/orders/${item.id}/review`
+                      : `/${organizationSlug}/orders/${item.id}`
                 }
               >
                 {item.status === 'draft' ? 'Continuar' : 'Ver'}

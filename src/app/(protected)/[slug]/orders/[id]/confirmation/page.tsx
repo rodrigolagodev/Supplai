@@ -9,12 +9,13 @@ import { notFound, redirect } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{
+    slug: string;
     id: string;
   }>;
 }
 
 export default async function OrderConfirmationPage({ params }: PageProps) {
-  const { id } = await params;
+  const { slug, id } = await params;
   const supabase = await createClient();
 
   const { data: order } = await supabase
@@ -34,7 +35,7 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
     if (supplierOrder) {
       // Supplier orders should view details, not confirmation
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      redirect(`/orders/${id}/details` as any);
+      redirect(`/${slug}/orders/${id}/details` as any);
     }
 
     // Neither found, show 404
@@ -48,7 +49,6 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
 
   const totalItems = items?.reduce((acc, item) => acc + Number(item.quantity), 0) || 0;
   const supplierCount = new Set(items?.map(i => i.supplier_id)).size;
-  const slug = order.organization?.slug;
 
   return (
     <div className="container mx-auto flex h-[80vh] max-w-lg flex-col items-center justify-center p-4">
@@ -85,7 +85,7 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
             <Link href={`/${slug}`}>Volver al Dashboard</Link>
           </Button>
           <Button asChild variant="ghost" className="w-full">
-            <Link href={`/orders/${id}/details`}>Ver detalle del pedido</Link>
+            <Link href={`/${slug}/orders/${id}/details`}>Ver detalle del pedido</Link>
           </Button>
         </CardFooter>
       </Card>

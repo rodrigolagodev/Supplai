@@ -173,3 +173,92 @@ export async function syncPendingItems() {
     }
   }
 }
+
+/**
+ * Force sync a specific order to Supabase
+ */
+export async function syncOrder(orderId: string) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error('User not authenticated');
+
+  const order = await db.orders.get(orderId);
+  if (!order) throw new Error('Order not found locally');
+
+  // Upsert order to Supabase
+  const { error } = await supabase.from('orders').upsert({
+    id: order.id,
+    organization_id: order.organization_id,
+    status: order.status,
+    created_at: order.created_at,
+    created_by: user.id,
+  });
+
+  if (error) throw error;
+
+  // Update local status
+  await db.orders.update(order.id, { sync_status: 'synced' });
+
+  // ALSO Sync pending messages for this order
+  const pendingMessages = await db.messages
+    .where('order_id')
+    .equals(orderId)
+    .and(m => m.sync_status === 'pending')
+    .toArray();
+
+  if (pendingMessages.length > 0) {
+    for (const msg of pendingMessages) {
+      try {
+        let audioFileId = msg.audio_url;
+
+        // Upload audio if needed (reusing logic from syncPendingItems would be better, but duplicating for safety now)
+        if (msg.type === 'audio' && msg.audio_blob && !audioFileId) {
+          const fileName = `${msg.order_id}/${msg.id}.webm`;
+          const { error: uploadError } = await supabase.storage
+            .from('orders')
+            .upload(fileName, msg.audio_blob, {
+              upsert: true,
+              contentType: 'audio/webm',
+            });
+          if (!uploadError) {
+            const { data: audioFile } = await supabase
+              .from('order_audio_files')
+              .insert({
+                order_id: msg.order_id,
+                storage_path: fileName,
+              })
+              .select('id')
+              .single();
+            if (audioFile) {
+              audioFileId = audioFile.id;
+              await db.messages.update(msg.id, { audio_url: audioFileId });
+            }
+          }
+        }
+
+        const role = (msg.role === 'system' ? 'assistant' : msg.role) as 'user' | 'assistant';
+
+        // We need to import saveConversationMessage or replicate it.
+        // Since it's a server action, we can't call it directly from client code easily if it's not exposed?
+        // Wait, saveConversationMessage IS imported in sync.ts!
+
+        await saveConversationMessage(
+          msg.order_id,
+          role,
+          msg.content,
+          audioFileId,
+          msg.sequence_number,
+          msg.id
+        );
+
+        await db.messages.update(msg.id, { sync_status: 'synced' });
+      } catch (msgError) {
+        console.error('Failed to sync message in syncOrder:', msgError);
+        // Don't throw, try next message
+      }
+    }
+  }
+}

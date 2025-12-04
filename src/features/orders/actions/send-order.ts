@@ -43,7 +43,7 @@ import type { OrderReviewItem } from '@/features/orders/actions/items';
  */
 export async function finalizeOrder(orderId: string, items: OrderReviewItem[]) {
   // Verify access to order first
-  await getOrderContext(orderId);
+  const { order } = await getOrderContext(orderId);
 
   // First save all items
   await saveOrderItems(orderId, items);
@@ -51,5 +51,8 @@ export async function finalizeOrder(orderId: string, items: OrderReviewItem[]) {
   // Use shared sendOrder action
   await sendOrder(orderId);
 
-  return { success: true, redirectUrl: `/orders/${orderId}/confirmation` };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orgSlug = (order as any).organization?.slug;
+
+  return { success: true, redirectUrl: `/${orgSlug}/orders/${orderId}/confirmation` };
 }

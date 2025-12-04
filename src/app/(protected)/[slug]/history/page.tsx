@@ -115,7 +115,12 @@ export default async function HistoryPage({
           </div>
         }
       >
-        <HistoryListContainer initialOrders={orders} organizationId={org.id} filters={filters} />
+        <HistoryListContainer
+          initialOrders={orders}
+          organizationId={org.id}
+          organizationSlug={slug}
+          filters={filters}
+        />
       </Suspense>
     </div>
   );

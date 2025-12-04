@@ -46,7 +46,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Actividad Reciente</h3>
         </div>
-        <RecentActivityList orders={recentOrders} />
+        <RecentActivityList orders={recentOrders} organizationSlug={slug} />
       </div>
     </div>
   );

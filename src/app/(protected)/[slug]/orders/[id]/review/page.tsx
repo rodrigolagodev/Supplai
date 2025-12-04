@@ -4,12 +4,13 @@ import { redirect } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{
+    slug: string;
     id: string;
   }>;
 }
 
 export default async function OrderReviewPage({ params }: PageProps) {
-  const { id } = await params;
+  const { slug, id } = await params;
 
   let initialData = null;
 
@@ -19,7 +20,7 @@ export default async function OrderReviewPage({ params }: PageProps) {
     // Protect against editing sent/archived orders
     if (initialData.order.status === 'sent' || initialData.order.status === 'archived') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      redirect(`/orders/${id}/details` as any);
+      redirect(`/${slug}/orders/${id}/details` as any);
     }
   } catch (error) {
     console.error('Failed to fetch order review data (possibly offline):', error);

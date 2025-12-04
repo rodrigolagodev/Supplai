@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DragEndEvent,
@@ -66,22 +66,37 @@ export function useOrderReview({
     })
   );
 
-  // Group items
-  const unclassifiedItems = items.filter(item => !item.supplier_id);
-  const itemsBySupplier = suppliers.reduce(
-    (acc, supplier) => {
-      acc[supplier.id] = items.filter(item => item.supplier_id === supplier.id);
-      return acc;
-    },
-    {} as Record<string, OrderItem[]>
+  // Group items - memoized
+  const unclassifiedItems = useMemo(() => items.filter(item => !item.supplier_id), [items]);
+
+  const itemsBySupplier = useMemo(
+    () =>
+      suppliers.reduce(
+        (acc, supplier) => {
+          acc[supplier.id] = items.filter(item => item.supplier_id === supplier.id);
+          return acc;
+        },
+        {} as Record<string, OrderItem[]>
+      ),
+    [suppliers, items]
   );
 
-  // Filter visible suppliers
-  const visibleSuppliers = suppliers.filter(supplier => {
-    if (showAllSuppliers) return true;
-    const itemCount = itemsBySupplier[supplier.id]?.length || 0;
-    return itemCount > 0;
-  });
+  // Filter visible suppliers - memoized to react to showAllSuppliers changes
+  const visibleSuppliers = useMemo(() => {
+    console.log('[visibleSuppliers] Recalculating with showAllSuppliers:', showAllSuppliers);
+    const result = suppliers.filter(supplier => {
+      if (showAllSuppliers) return true;
+      const itemCount = itemsBySupplier[supplier.id]?.length || 0;
+      return itemCount > 0;
+    });
+    console.log(
+      '[visibleSuppliers] Result count:',
+      result.length,
+      'Total suppliers:',
+      suppliers.length
+    );
+    return result;
+  }, [suppliers, showAllSuppliers, itemsBySupplier]);
 
   // Handlers
   const handleSupplierCreated = (newSupplier?: Supplier) => {
@@ -186,13 +201,20 @@ export function useOrderReview({
   const handleCancelOrder = async () => {
     setIsCancelling(true);
     try {
-      await cancelOrder(orderId);
+      const result = await cancelOrder(orderId);
+
+      if (!result.success) {
+        toast.error(result.error || 'Error al eliminar pedido');
+        return;
+      }
+
       toast.success('Pedido eliminado');
       router.push(`/${organizationSlug}`);
-    } catch {
-      toast.error('Error al eliminar pedido');
+    } catch (error) {
+      console.error('Error canceling order:', error);
+      toast.error('Error al eliminar el pedido');
+    } finally {
       setIsCancelling(false);
-      setShowCancelConfirm(false);
     }
   };
 

@@ -4,7 +4,13 @@ import { HistoryItem as HistoryItemType } from '@/app/(protected)/[slug]/history
 import { HistoryItem } from './HistoryItem';
 import { Inbox } from 'lucide-react';
 
-export function HistoryList({ items }: { items: HistoryItemType[] }) {
+export function HistoryList({
+  items,
+  organizationSlug,
+}: {
+  items: HistoryItemType[];
+  organizationSlug: string;
+}) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-stone-500">
@@ -20,7 +26,11 @@ export function HistoryList({ items }: { items: HistoryItemType[] }) {
   return (
     <div className="space-y-3">
       {items.map(item => (
-        <HistoryItem key={`${item.type}-${item.id}`} item={item} />
+        <HistoryItem
+          key={`${item.type}-${item.id}`}
+          item={item}
+          organizationSlug={organizationSlug}
+        />
       ))}
     </div>
   );

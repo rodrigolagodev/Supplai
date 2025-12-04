@@ -8,6 +8,7 @@ import { refreshHistoryOrders, type HistoryFilter } from '@/app/(protected)/[slu
 interface HistoryListContainerProps {
   initialOrders: HistoryItem[];
   organizationId: string;
+  organizationSlug: string;
   filters: HistoryFilter;
 }
 
@@ -18,6 +19,7 @@ interface HistoryListContainerProps {
 export function HistoryListContainer({
   initialOrders,
   organizationId,
+  organizationSlug,
   filters,
 }: HistoryListContainerProps) {
   // Function to refresh orders when realtime events occur
@@ -32,5 +34,5 @@ export function HistoryListContainer({
     onRefresh: handleRefresh,
   });
 
-  return <HistoryList items={orders} />;
+  return <HistoryList items={orders} organizationSlug={organizationSlug} />;
 }

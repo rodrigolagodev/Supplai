@@ -51,17 +51,43 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [isOnline]);
 
+  const syncPromiseRef = React.useRef<Promise<void> | null>(null);
+
   const syncNow = async () => {
-    if (isSyncing || !navigator.onLine) return;
+    if (!navigator.onLine) return;
+
+    // If a sync is already running, wait for it to finish first
+    if (isSyncing && syncPromiseRef.current) {
+      try {
+        await syncPromiseRef.current;
+      } catch {
+        // Ignore error from previous sync
+      }
+    }
+
+    // Double check online status and ensure we don't start if another sync grabbed the lock in the microtask
+    if (!navigator.onLine) return;
 
     setIsSyncing(true);
-    try {
-      await syncPendingItems();
-    } catch (error) {
-      console.error('Sync failed:', error);
-    } finally {
-      setIsSyncing(false);
-    }
+
+    setIsSyncing(true);
+
+    const task = async () => {
+      try {
+        await syncPendingItems();
+      } catch (error) {
+        console.error('Sync failed:', error);
+      } finally {
+        setIsSyncing(false);
+        if (syncPromiseRef.current === currentPromise) {
+          syncPromiseRef.current = null;
+        }
+      }
+    };
+
+    const currentPromise = task();
+    syncPromiseRef.current = currentPromise;
+    await currentPromise;
   };
 
   return (

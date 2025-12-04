@@ -1,6 +1,15 @@
 /**
  * Domain Events for Order Aggregate
  *
+ * NOTE: This is planned infrastructure for future features:
+ * - Analytics tracking
+ * - Audit trails
+ * - Event-driven notifications
+ *
+ * Currently these events are NOT emitted anywhere in the codebase.
+ * The types are defined here to establish the event schema for when
+ * we implement event sourcing or analytics tracking.
+ *
  * These events represent things that have happened in the domain.
  * They can be used for:
  * - Analytics tracking

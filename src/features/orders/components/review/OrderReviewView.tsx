@@ -132,7 +132,15 @@ export function OrderReviewView({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowAllSuppliers(!showAllSuppliers)}
+              onClick={() => {
+                console.log('[ShowAllSuppliers] Button clicked, current state:', showAllSuppliers);
+                console.log('[ShowAllSuppliers] visibleSuppliers before:', visibleSuppliers.length);
+                setShowAllSuppliers(!showAllSuppliers);
+                console.log(
+                  '[ShowAllSuppliers] setShowAllSuppliers called with:',
+                  !showAllSuppliers
+                );
+              }}
               className="text-muted-foreground"
             >
               {showAllSuppliers ? 'Ocultar proveedores vacíos' : 'Mostrar todos los proveedores'}
@@ -140,19 +148,31 @@ export function OrderReviewView({
           </div>
 
           {/* Suppliers List */}
-          <StaggerContainer className="space-y-6">
-            {visibleSuppliers.map(supplier => (
-              <MotionItem key={supplier.id}>
-                <SupplierSection
-                  supplier={supplier}
-                  items={itemsBySupplier[supplier.id] || []}
-                  onItemUpdate={handleUpdateItem}
-                  onAddItem={handleAddItem}
-                  onDelete={handleDeleteItem}
-                  isDroppable={true}
-                />
-              </MotionItem>
-            ))}
+          <StaggerContainer
+            key={showAllSuppliers ? 'all-suppliers' : 'filtered-suppliers'}
+            className="space-y-6"
+          >
+            {(() => {
+              console.log(
+                '[OrderReviewView] Rendering suppliers list, count:',
+                visibleSuppliers.length
+              );
+              console.log('[OrderReviewView] showAllSuppliers:', showAllSuppliers);
+              console.log('[OrderReviewView] Full supplier objects:', visibleSuppliers);
+              console.log('[OrderReviewView] First supplier:', visibleSuppliers[0]);
+              return visibleSuppliers.map(supplier => (
+                <MotionItem key={supplier.id}>
+                  <SupplierSection
+                    supplier={supplier}
+                    items={itemsBySupplier[supplier.id] || []}
+                    onItemUpdate={handleUpdateItem}
+                    onAddItem={handleAddItem}
+                    onDelete={handleDeleteItem}
+                    isDroppable={true}
+                  />
+                </MotionItem>
+              ));
+            })()}
 
             {visibleSuppliers.length === 0 && !showAllSuppliers && (
               <div className="text-center py-12 text-muted-foreground">
