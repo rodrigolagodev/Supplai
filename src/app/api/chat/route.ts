@@ -108,40 +108,88 @@ INSTRUCCIONES ADICIONALES:
     systemInstruction: enhancedSystemPrompt,
   });
 
-  const chat = model.startChat({ history });
+  try {
+    const chat = model.startChat({ history });
 
-  // Stream the response
-  const result = await chat.sendMessageStream(String(lastMessage.content));
+    // Stream the response
+    const result = await chat.sendMessageStream(String(lastMessage.content));
 
-  const encoder = new TextEncoder();
-  let fullResponse = '';
+    const encoder = new TextEncoder();
+    let fullResponse = '';
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
-          fullResponse += text;
-          controller.enqueue(encoder.encode(text));
-        }
-
-        // Save assistant message after streaming completes
+    const stream = new ReadableStream({
+      async start(controller) {
         try {
-          await saveConversationMessage(orderId, 'assistant', fullResponse, undefined, nextSeq + 1);
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            fullResponse += text;
+            controller.enqueue(encoder.encode(text));
+          }
+
+          // Save assistant message after streaming completes
+          try {
+            await saveConversationMessage(
+              orderId,
+              'assistant',
+              fullResponse,
+              undefined,
+              nextSeq + 1
+            );
+          } catch (error) {
+            console.error('Failed to save assistant message:', error);
+          }
+
+          controller.close();
         } catch (error) {
-          console.error('Failed to save assistant message:', error);
+          console.error('Stream error:', error);
+          controller.error(error);
         }
+      },
+    });
 
-        controller.close();
-      } catch (error) {
-        controller.error(error);
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    console.error('Gemini API Error:', error);
+
+    // Check for quota exceeded (429) or overloaded (503)
+    if (
+      error?.status === 429 ||
+      error?.status === 503 ||
+      error?.message?.includes('429') ||
+      error?.message?.includes('quota')
+    ) {
+      return new Response(
+        JSON.stringify({
+          error: 'quota_exceeded',
+          message: 'El sistema de IA está ocupado. Por favor intenta de nuevo en unos momentos.',
+          retryAfter: 60, // Default to 60s if not provided
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '60',
+          },
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        error: 'internal_error',
+        message: 'Error procesando tu mensaje',
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-    },
-  });
+    );
+  }
 }

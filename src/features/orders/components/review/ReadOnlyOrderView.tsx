@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Package, Calendar, Clock } from 'lucide-react';
+import { Package, Calendar, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Database } from '@/types/database';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useRouter } from 'next/navigation';
 
 type OrderItem = Database['public']['Tables']['order_items']['Row'] & {
   supplier?: { name: string; category: string } | null;
@@ -25,7 +24,6 @@ interface ReadOnlyOrderViewProps {
 }
 
 export function ReadOnlyOrderView({ order, items, suppliers }: ReadOnlyOrderViewProps) {
-  const router = useRouter();
   const [showAllSuppliers, setShowAllSuppliers] = useState(false);
 
   // Group items by supplier
@@ -48,11 +46,6 @@ export function ReadOnlyOrderView({ order, items, suppliers }: ReadOnlyOrderView
   const totalProducts = items.length;
   const totalUnits = items.reduce((acc, item) => acc + Number(item.quantity), 0);
   const suppliersWithItems = new Set(items.map(i => i.supplier_id)).size;
-
-  const handleBack = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    router.push(`/${order.organization?.slug}` as any);
-  };
 
   // Get status badge
   const getStatusBadge = () => {
@@ -84,13 +77,7 @@ export function ReadOnlyOrderView({ order, items, suppliers }: ReadOnlyOrderView
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={handleBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver al Dashboard
-        </Button>
-        {getStatusBadge()}
-      </div>
+      <div className="flex items-center justify-end">{getStatusBadge()}</div>
 
       {/* Order Info Card */}
       <Card>

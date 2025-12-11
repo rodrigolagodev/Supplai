@@ -55,6 +55,15 @@ export class CallAICommand implements Command {
       });
 
       if (!res.ok) {
+        if (res.status === 429) {
+          const errorData = await res.json().catch(() => ({}));
+          // Return a fake response object that mimics a successful fetch but with our error message
+          // This allows the stream reader below to process it as a single chunk
+          const errorMessage =
+            errorData.message ||
+            'El sistema está experimentando mucha demanda. Por favor intenta nuevamente en un minuto.';
+          return new Response(errorMessage, { status: 200 });
+        }
         throw new Error(`API error: ${res.status}`);
       }
       return res;
