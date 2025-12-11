@@ -101,7 +101,7 @@ INSTRUCCIONES ADICIONALES:
   }));
 
   const model = genAI.getGenerativeModel({
-    model: 'models/gemini-2.0-flash',
+    model: 'models/gemini-1.5-flash',
     generationConfig: {
       temperature: 0.7,
     },
