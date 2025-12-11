@@ -154,6 +154,11 @@ INSTRUCCIONES ADICIONALES:
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
+    // DEBUG: Always log the full error to understand why it persists
+    console.error('DEBUG - Gemini Full Error:', JSON.stringify(error, null, 2));
+    console.error('DEBUG - Error Message:', error.message);
+    console.error('DEBUG - Error Status:', error.status);
+
     const isQuotaError =
       error?.status === 429 ||
       error?.status === 503 ||
