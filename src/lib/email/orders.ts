@@ -39,7 +39,7 @@ export async function sendOrderEmail({
     {} as Record<string, OrderItemEmailData[]>
   );
 
-  const { data, error } = await resend.emails.send({
+  const result = await resend.emails.send({
     from: 'Pedidos <orders@resend.dev>', // Change to your domain in production
     to: [to],
     subject: `Nuevo pedido de ${organizationName}`,
@@ -91,10 +91,9 @@ export async function sendOrderEmail({
     `,
   });
 
-  if (error) {
-    console.error('Error sending order email:', error);
-    return null;
+  if (result.error) {
+    console.error('Error sending order email:', result.error);
   }
 
-  return data;
+  return result;
 }

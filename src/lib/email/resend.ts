@@ -24,7 +24,7 @@ export async function sendInvitationEmail({
   const inviteUrl = `${siteUrl}/invite/${invitationToken}`;
   const roleText = role === 'admin' ? 'administrador' : 'miembro';
 
-  const { data, error } = await resend.emails.send({
+  const result = await resend.emails.send({
     from: 'Pedidos <onboarding@resend.dev>', // Change to your domain in production
     to: [to],
     subject: `Has sido invitado a unirte a ${organizationName} en Pedidos`,
@@ -69,12 +69,11 @@ export async function sendInvitationEmail({
     `,
   });
 
-  if (error) {
-    console.error('Error sending invitation email:', error);
+  if (result.error) {
+    console.error('Error sending invitation email:', result.error);
     // Don't throw - email failure shouldn't block invitation creation
     // The invitation link will be shown in the UI as fallback
-    return null;
   }
 
-  return data;
+  return result;
 }

@@ -56,8 +56,8 @@ export class NotificationService {
           })),
         });
 
-        if (!emailResult) {
-          throw new Error('Email service returned null');
+        if (emailResult.error) {
+          throw new Error(`Email service error: ${emailResult.error.message}`);
         }
       } else {
         // No email? Maybe WhatsApp in future. For now, if no email, it's a "manual" send or error.
