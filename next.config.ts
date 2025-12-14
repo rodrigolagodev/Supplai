@@ -1,14 +1,10 @@
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
 
-// Detect if we're using Turbopack (default in Next.js 16)
-const isTurbopack =
-  process.env.TURBOPACK === '1' || (!process.env.TURBOPACK && !process.argv.includes('--webpack'));
-
 const withPWA = withPWAInit({
   dest: 'public',
-  // Disable PWA in development OR when using Turbopack
-  disable: process.env.NODE_ENV === 'development' || isTurbopack,
+  // Only disable in development
+  disable: process.env.NODE_ENV === 'development',
   register: true,
   reloadOnOnline: true,
   fallbacks: {

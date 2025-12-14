@@ -5,6 +5,7 @@ import {
   getUserOrganizations,
 } from '@/lib/auth/session';
 import { TopBar, BottomNavBar, FloatingActionButton } from '@/components/navigation';
+import { InstallPWABanner } from '@/components/pwa/InstallPWABanner';
 
 interface OrgLayoutProps {
   children: React.ReactNode;
@@ -58,6 +59,9 @@ export default async function OrganizationLayout({ children, params }: OrgLayout
 
       {/* Floating Action Button (conditional) */}
       <FloatingActionButton currentPath={`/${slug}`} organizationSlug={slug} />
+
+      {/* PWA Install Banner (mobile only) */}
+      <InstallPWABanner />
     </div>
   );
 }
