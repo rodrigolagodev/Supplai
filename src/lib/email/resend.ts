@@ -20,7 +20,7 @@ export async function sendInvitationEmail({
   const siteUrl =
     process.env.NODE_ENV === 'development'
       ? 'http://localhost:3000'
-      : 'https://pedidos-ai.vercel.app';
+      : 'https://supplai-web.vercel.app';
   const inviteUrl = `${siteUrl}/invite/${invitationToken}`;
   const roleText = role === 'admin' ? 'administrador' : 'miembro';
 

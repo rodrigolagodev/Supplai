@@ -3,7 +3,7 @@
 // Mock the environment variable with spaces to test the trim logic
 // We need to do this before importing the module if it reads env vars at top level,
 // but getBaseUrl reads them at function call time.
-process.env.NEXT_PUBLIC_SITE_URL = '   https://pedidos-ai.vercel.app   ';
+process.env.NEXT_PUBLIC_SITE_URL = '   https://supplai-web.vercel.app   ';
 
 // We can't easily import the server action file directly in a standalone node script
 // because of the 'use server' directive and Next.js specific imports.
@@ -35,7 +35,7 @@ console.log(`Raw env var: "${process.env.NEXT_PUBLIC_SITE_URL}"`);
 const result = getBaseUrl();
 console.log(`Result: "${result}"`);
 
-if (result === 'https://pedidos-ai.vercel.app') {
+if (result === 'https://supplai-web.vercel.app') {
   console.log('✅ SUCCESS: Spaces were trimmed correctly.');
 } else {
   console.log('❌ FAILURE: Spaces were NOT trimmed.');

@@ -4,7 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
-  title: 'Pedidos',
+  title: 'Supplai',
   description: 'Automatiza tus pedidos a proveedores con voz',
 };
 

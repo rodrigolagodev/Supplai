@@ -4,11 +4,11 @@ This guide will help you configure your production environment correctly.
 
 ## Step 1: Configure Vercel Environment Variable
 
-1. Go to your Vercel project: https://vercel.com/your-team/pedidos-ai
+1. Go to your Vercel project: https://vercel.com/your-team/supplai
 2. Navigate to: **Settings** → **Environment Variables**
 3. Add a new environment variable:
    - **Name**: `NEXT_PUBLIC_SITE_URL`
-   - **Value**: `https://pedidos-ai.vercel.app`
+   - **Value**: `https://supplai-web.vercel.app`
    - **Environment**: Select **Production**, **Preview**, and **Development**
 4. Click **Save**
 
@@ -21,14 +21,14 @@ This guide will help you configure your production environment correctly.
    **Site URL**:
 
    ```
-   https://pedidos-ai.vercel.app
+   https://supplai-web.vercel.app
    ```
 
    **Redirect URLs** (add all of these):
 
    ```
-   https://pedidos-ai.vercel.app/auth/callback
-   https://pedidos-ai.vercel.app/auth/confirm
+   https://supplai-web.vercel.app/auth/callback
+   https://supplai-web.vercel.app/auth/confirm
    http://localhost:3000/auth/callback
    http://localhost:3000/auth/confirm
    ```
@@ -48,10 +48,10 @@ After setting the environment variable in Vercel:
 ## Step 4: Test Email Confirmation
 
 1. Wait for deployment to complete
-2. Go to: https://pedidos-ai.vercel.app/register
+2. Go to: https://supplai-web.vercel.app/register
 3. Register with a new email address
 4. Check your email
-5. Verify the confirmation link now points to `https://pedidos-ai.vercel.app` (not localhost)
+5. Verify the confirmation link now points to `https://supplai-web.vercel.app` (not localhost)
 6. Click the link and confirm it works
 
 ## Troubleshooting

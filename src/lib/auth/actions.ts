@@ -13,7 +13,7 @@ function getBaseUrl(): string {
     return 'http://localhost:3000';
   }
 
-  return 'https://pedidos-ai.vercel.app';
+  return 'https://supplai-web.vercel.app';
 }
 
 export interface AuthActionResult {
