@@ -7,6 +7,7 @@ if (!process.env.GROQ_API_KEY) {
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
+  timeout: 45000, // 45 seconds (less than frontend 60s timeout)
 });
 
 export interface TranscriptionResult {

@@ -235,68 +235,109 @@ export function useAudioTranscription(options: UseAudioTranscriptionOptions) {
         formData.append('audio', blob, 'recording.webm');
         formData.append('orderId', orderId);
 
-        const response = await fetch('/api/process-audio', {
-          method: 'POST',
-          body: formData,
-        });
+        // Setup timeout for fetch (60 seconds)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
+        let response: Response;
 
-          // Detectar rate limit de Groq
-          if (response.status === 413 || errorData.error?.code === 'rate_limit_exceeded') {
+        try {
+          response = await fetch('/api/process-audio', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+
+            // Detectar rate limit de Groq
+            if (response.status === 413 || errorData.error?.code === 'rate_limit_exceeded') {
+              const error: AudioError = {
+                type: 'rate_limit',
+                resetAt: new Date(Date.now() + 60 * 60 * 1000), // Estimar 1 hora
+                message: 'Límite de transcripción alcanzado. Intenta en 1 hora o usa texto.',
+              };
+              setState({ status: 'error', error, blob, retryable: false });
+              onError?.(error);
+              return;
+            }
+
             const error: AudioError = {
-              type: 'rate_limit',
-              resetAt: new Date(Date.now() + 60 * 60 * 1000), // Estimar 1 hora
-              message: 'Límite de transcripción alcanzado. Intenta en 1 hora o usa texto.',
+              type: 'upload_failed',
+              message: errorData.error || 'Error al subir el audio',
+              retryCount: 0,
             };
-            setState({ status: 'error', error, blob, retryable: false });
+            setState({ status: 'error', error, blob, retryable: true });
             onError?.(error);
             return;
           }
 
-          const error: AudioError = {
-            type: 'upload_failed',
-            message: errorData.error || 'Error al subir el audio',
-            retryCount: 0,
-          };
-          setState({ status: 'error', error, blob, retryable: true });
-          onError?.(error);
-          return;
+          // Process successful response
+          const { transcription, audioFileId } = await response.json();
+
+          // 4. Transcripción exitosa
+          setState({
+            status: 'success',
+            transcription,
+            audioFileId,
+            duration,
+          });
+
+          // Guardar en histórico
+          processedRecordingsRef.current.push({
+            blobHash,
+            timestamp: Date.now(),
+            duration,
+            size: blob.size,
+            transcription,
+          });
+
+          // Limpiar grabaciones antiguas (más de 1 hora)
+          const oneHourAgo = Date.now() - 60 * 60 * 1000;
+          processedRecordingsRef.current = processedRecordingsRef.current.filter(
+            r => r.timestamp > oneHourAgo
+          );
+
+          onSuccess?.({
+            transcription,
+            audioFileId,
+            confidence: 0.9,
+            duration,
+            orderId,
+          });
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+
+          // Handle abort/timeout
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            const error: AudioError = {
+              type: 'upload_failed',
+              message: 'La transcripción tardó demasiado. Intenta con un audio más corto.',
+              retryCount: 0,
+            };
+            setState({ status: 'error', error, blob, retryable: true });
+            onError?.(error);
+            return;
+          }
+
+          // Handle network errors
+          if (fetchError instanceof TypeError) {
+            const error: AudioError = {
+              type: 'upload_failed',
+              message: 'Error de conexión. Verifica tu internet e intenta de nuevo.',
+              retryCount: 0,
+            };
+            setState({ status: 'error', error, blob, retryable: true });
+            onError?.(error);
+            return;
+          }
+
+          // Re-throw other errors to be caught by outer try-catch
+          throw fetchError;
         }
-
-        const { transcription, audioFileId } = await response.json();
-
-        // 4. Transcripción exitosa
-        setState({
-          status: 'success',
-          transcription,
-          audioFileId,
-          duration,
-        });
-
-        // Guardar en histórico
-        processedRecordingsRef.current.push({
-          blobHash,
-          timestamp: Date.now(),
-          duration,
-          size: blob.size,
-          transcription,
-        });
-
-        // Limpiar grabaciones antiguas (más de 1 hora)
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        processedRecordingsRef.current = processedRecordingsRef.current.filter(
-          r => r.timestamp > oneHourAgo
-        );
-
-        onSuccess?.({
-          transcription,
-          audioFileId,
-          confidence: 0.9,
-          duration,
-          orderId,
-        });
       } catch (err) {
         const error: AudioError = {
           type: 'unknown',
