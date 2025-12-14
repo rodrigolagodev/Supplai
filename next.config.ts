@@ -90,20 +90,13 @@ const withPWA = withPWAInit({
         },
       },
       {
-        urlPattern: /\/api\/.*$/i,
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'apis',
-          networkTimeoutSeconds: 10,
-          expiration: {
-            maxEntries: 16,
-            maxAgeSeconds: 24 * 60 * 60, // 24 hours
-          },
-        },
-      },
-      {
         // Supabase calls - Network Only (no cache)
         urlPattern: /^https:\/\/.*\.supabase\.co\/.*$/i,
+        handler: 'NetworkOnly',
+      },
+      {
+        // API routes - Network Only (no cache for dynamic/POST endpoints)
+        urlPattern: /\/api\/.*$/i,
         handler: 'NetworkOnly',
       },
       {
