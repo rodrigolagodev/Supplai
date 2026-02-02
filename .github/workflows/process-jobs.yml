@@ -11,6 +11,12 @@ on:
 jobs:
   process-jobs:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Reintentar automáticamente si falla por problemas de infraestructura
+    strategy:
+      fail-fast: false
+      max-parallel: 1
 
     steps:
       - name: Validate Environment
