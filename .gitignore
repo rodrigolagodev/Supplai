@@ -27,8 +27,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# PWA files
-**/public/sw.js
+# PWA build artifacts (we ship a hand-written public/sw.js kill-switch, kept in git)
 **/public/workbox-*.js
 **/public/worker-*.js
 **/public/fallback-*.js
