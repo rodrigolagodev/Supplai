@@ -58,6 +58,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        {/*
+          OpenNext bundles the server with esbuild `keepNames`, which wraps functions
+          in `__name(...)`. next-themes serializes its theme-init function with
+          `.toString()` and inlines it into the HTML, carrying those `__name(...)` calls
+          — but `__name` isn't defined in the browser, throwing a ReferenceError that
+          breaks hydration. Define a no-op shim before any inlined script runs.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: 'globalThis.__name||=function(t){return t};',
+          }}
+        />
+      </head>
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
