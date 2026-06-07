@@ -1,21 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import Groq from 'groq-sdk';
-
-// Lazily create the client on first use. On the Workers runtime (workerd), env vars
-// are only reliably available at request time, not at module-import time.
-let cachedGroq: Groq | null = null;
-
-function getGroq(): Groq {
-  if (cachedGroq) return cachedGroq;
-  if (!process.env.GROQ_API_KEY) {
-    console.warn('Missing GROQ_API_KEY environment variable');
-  }
-  cachedGroq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-    timeout: 45000, // 45 seconds (less than frontend 60s timeout)
-  });
-  return cachedGroq;
-}
 
 export interface TranscriptionResult {
   text: string;
@@ -25,63 +8,92 @@ export interface TranscriptionResult {
     text: string;
     start: number;
     end: number;
-    confidence: number; // Groq returns avg_logprob, we'll normalize it
+    confidence: number; // Groq returns avg_logprob, we normalize it
   }>;
 }
 
+const GROQ_TRANSCRIPTION_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+const REQUEST_TIMEOUT_MS = 30000;
+
 /**
- * Transcribe audio using Groq Whisper
- * Retries up to 3 times with exponential backoff
+ * Transcribe audio using Groq Whisper.
+ *
+ * Calls the Groq REST API directly with native fetch + FormData instead of the groq-sdk.
+ * The SDK relies on Node stream/multipart internals that hang on the Cloudflare Workers
+ * (`workerd`) runtime, causing the upload to time out. Native FormData uploads work
+ * correctly on Workers.
  */
 export async function transcribeAudio(audioFile: File): Promise<TranscriptionResult> {
   return withRetry(async () => {
-    try {
-      const transcription = await getGroq().audio.transcriptions.create({
-        file: audioFile,
-        model: 'whisper-large-v3',
-        language: 'es', // Force Spanish
-        response_format: 'verbose_json',
-        temperature: 0.0, // Deterministic
-      });
-
-      // Calculate average confidence from segments
-      // Whisper returns avg_logprob. Convert to 0-1 probability: e^avg_logprob
-      // Note: Groq might return different fields, but standard Whisper is avg_logprob
-      const segments = (transcription as any).segments || [];
-
-      let totalConfidence = 0;
-      const formattedSegments = segments.map((seg: any) => {
-        // Convert logprob to probability if needed, or use if provided
-        // Groq Whisper v3 often returns high quality text
-        // We'll use a simplified confidence metric for now
-        const confidence = seg.avg_logprob ? Math.exp(seg.avg_logprob) : 0.9;
-        totalConfidence += confidence;
-
-        return {
-          text: seg.text,
-          start: seg.start,
-          end: seg.end,
-          confidence,
-        };
-      });
-
-      const avgConfidence = segments.length > 0 ? totalConfidence / segments.length : 0.9; // Default if no segments
-
-      return {
-        text: transcription.text,
-        confidence: Math.min(Math.max(avgConfidence, 0), 1), // Clamp 0-1
-        duration: (transcription as any).duration || 0,
-        segments: formattedSegments,
-      };
-    } catch (error) {
-      console.error('Groq transcription error:', error);
-      throw error;
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      throw new Error('Missing GROQ_API_KEY environment variable');
     }
+
+    const form = new FormData();
+    form.append('file', audioFile, audioFile.name || 'audio.webm');
+    form.append('model', 'whisper-large-v3');
+    form.append('language', 'es');
+    form.append('response_format', 'verbose_json');
+    form.append('temperature', '0');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(GROQ_TRANSCRIPTION_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      // Normalize abort (timeout) so withRetry treats it as retriable.
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Groq request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      const err = new Error(`Groq API error ${response.status}: ${body.slice(0, 200)}`);
+      (err as any).status = response.status;
+      throw err;
+    }
+
+    const transcription: any = await response.json();
+
+    const segments = transcription.segments || [];
+    let totalConfidence = 0;
+    const formattedSegments = segments.map((seg: any) => {
+      // Whisper returns avg_logprob; convert to a 0-1 probability.
+      const confidence = seg.avg_logprob ? Math.exp(seg.avg_logprob) : 0.9;
+      totalConfidence += confidence;
+      return {
+        text: seg.text,
+        start: seg.start,
+        end: seg.end,
+        confidence,
+      };
+    });
+
+    const avgConfidence = segments.length > 0 ? totalConfidence / segments.length : 0.9;
+
+    return {
+      text: transcription.text,
+      confidence: Math.min(Math.max(avgConfidence, 0), 1),
+      duration: transcription.duration || 0,
+      segments: formattedSegments,
+    };
   });
 }
 
 /**
- * Retry helper with exponential backoff
+ * Retry helper with exponential backoff. Does not retry client errors (4xx).
  */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
   for (let i = 0; i < maxRetries; i++) {
@@ -90,8 +102,9 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 10
     } catch (error) {
       if (i === maxRetries - 1) throw error;
 
-      // Don't retry on client errors (4xx)
-      if (error instanceof Error && (error as any).status >= 400 && (error as any).status < 500) {
+      // Don't retry on client errors (4xx).
+      const status = (error as any).status;
+      if (typeof status === 'number' && status >= 400 && status < 500) {
         throw error;
       }
 
