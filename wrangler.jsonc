@@ -10,6 +10,7 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "routes": [{ "pattern": "supplai.rlago.com", "custom_domain": true }],
   // Job/email fallback: runs every 3 minutes. The happy path sends inline from the
   // submit action; this only retries jobs left pending (rate limits, failures).
   "triggers": {
