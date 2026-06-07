@@ -34,8 +34,14 @@ export async function middleware(request: NextRequest) {
     route => pathname === route || pathname.startsWith(`${route}/`)
   );
 
-  // If user is not authenticated and trying to access protected route
+  // If user is not authenticated and trying to access a protected route.
   if (!user && !isPublicRoute) {
+    // API routes must return a clean 401 — never redirect to /login. A 307 redirect
+    // on a fetch() (e.g. audio upload) is followed automatically and the client then
+    // parses the /login HTML as JSON and fails confusingly.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const redirectUrl = new URL('/login', request.url);
     redirectUrl.searchParams.set('redirectTo', pathname);
     return NextResponse.redirect(redirectUrl);
