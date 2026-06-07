@@ -1,18 +1,26 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn('Missing GEMINI_API_KEY environment variable');
-}
+// Lazily create the model on first use. On the Workers runtime (workerd), env vars
+// are only reliably available at request time, not at module-import time, so we must
+// not read process.env or construct the client at the top level.
+let cachedModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']> | null = null;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({
-  model: 'models/gemini-2.5-flash',
-  generationConfig: {
-    temperature: 0.1, // Low temperature for deterministic parsing
-    responseMimeType: 'application/json',
-  },
-});
+function getModel() {
+  if (cachedModel) return cachedModel;
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('Missing GEMINI_API_KEY environment variable');
+  }
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+  cachedModel = genAI.getGenerativeModel({
+    model: 'models/gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0.1, // Low temperature for deterministic parsing
+      responseMimeType: 'application/json',
+    },
+  });
+  return cachedModel;
+}
 
 // Valid units and categories
 const validUnits = ['kg', 'g', 'units', 'dozen', 'liters', 'ml', 'packages', 'boxes'] as const;
@@ -147,7 +155,7 @@ export async function parseOrderText(
                 }
             `;
 
-      const result = await model.generateContent(prompt);
+      const result = await getModel().generateContent(prompt);
       const response = result.response;
       const textResponse = response.text();
 

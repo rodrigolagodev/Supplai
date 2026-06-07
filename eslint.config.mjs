@@ -5,7 +5,19 @@ import prettierConfig from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['.next/**', 'node_modules/**', 'supabase/functions/**'],
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'supabase/functions/**',
+      // Build artifacts and generated files
+      '.open-next/**',
+      '.wrangler/**',
+      'public/sw.js',
+      'public/workbox-*.js',
+      'cloudflare-env.d.ts',
+      // Custom Worker entry: imports the generated bundle, bundled by Wrangler
+      'worker.ts',
+    ],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],

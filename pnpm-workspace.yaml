@@ -1,0 +1,5 @@
+# pnpm v10 moved several settings out of package.json into this file.
+# Allow these packages to run their install/build scripts (needed by Wrangler).
+onlyBuiltDependencies:
+  - esbuild
+  - workerd

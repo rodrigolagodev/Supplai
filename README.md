@@ -62,7 +62,7 @@ This project showcases a modern, serverless architecture designed for speed and 
 - **AI Layer**:
   - **Groq**: For sub-second audio transcription.
   - **Gemini 1.5**: For complex reasoning and text parsing.
-- **Infrastructure**: Deployed on Vercel Edge Network.
+- **Infrastructure**: Deployed on Cloudflare Workers via OpenNext (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 ## 📚 Internal Documentation
 

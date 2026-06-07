@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "supplai",
+  // Custom entry: wraps the OpenNext fetch handler and adds the Cron Trigger
+  // (scheduled) handler for the job/email fallback processor.
+  "main": "worker.ts",
+  "compatibility_date": "2026-06-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Job/email fallback: runs every 3 minutes. The happy path sends inline from the
+  // submit action; this only retries jobs left pending (rate limits, failures).
+  "triggers": {
+    "crons": ["*/3 * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+  // Secrets (set with `wrangler secret put`, never committed):
+  //   SUPABASE_SERVICE_ROLE_KEY, GROQ_API_KEY, GEMINI_API_KEY, RESEND_API_KEY,
+  //   EMAIL_FROM, CRON_SECRET
+  // Public build-time vars (NEXT_PUBLIC_*) are configured in Workers Builds.
+}

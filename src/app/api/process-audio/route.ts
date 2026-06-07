@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getOrderContext, authErrorStatus } from '@/lib/auth/context';
 import { AudioService } from '@/features/orders/server/services/audio-service';
 
 export async function POST(request: NextRequest) {
@@ -12,36 +12,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing audio file or orderId' }, { status: 400 });
     }
 
-    // 1. Validate user access
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Verify user has access to this order via organization membership
-    const { data: order } = await supabase
-      .from('orders')
-      .select('organization_id')
-      .eq('id', orderId)
-      .single();
-
-    if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    }
-
-    const { data: membership } = await supabase
-      .from('memberships')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('organization_id', order.organization_id)
-      .single();
-
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // 1. Validate auth + order access + membership
+    let supabase;
+    try {
+      ({ supabase } = await getOrderContext(orderId));
+    } catch (authError) {
+      return NextResponse.json(
+        { error: (authError as Error).message },
+        { status: authErrorStatus(authError) }
+      );
     }
 
     // 2. Convert File to Blob and process with AudioService

@@ -27,6 +27,14 @@ export class NotificationService {
       throw new Error('Supplier order not found');
     }
 
+    // Idempotency guard: never re-send an order that was already delivered. This
+    // protects against duplicate emails if a job is processed more than once (e.g.
+    // the inline path and the cron racing, or a retry after a partial failure).
+    if (supplierOrder.status === 'sent') {
+      console.warn(`Supplier order ${supplierOrderId} already sent, skipping`);
+      return;
+    }
+
     // 2. Update status to sending
     await supabase.from('supplier_orders').update({ status: 'sending' }).eq('id', supplierOrderId);
 

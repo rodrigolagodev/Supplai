@@ -1,6 +1,4 @@
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { EMAIL_FROM, getResend } from './config';
 
 export interface OrderItemEmailData {
   product: string;
@@ -39,8 +37,8 @@ export async function sendOrderEmail({
     {} as Record<string, OrderItemEmailData[]>
   );
 
-  const result = await resend.emails.send({
-    from: 'Supplai <orders@resend.dev>', // Change to your domain in production
+  const result = await getResend().emails.send({
+    from: EMAIL_FROM,
     to: [to],
     subject: `Nuevo pedido de ${organizationName}`,
     html: `

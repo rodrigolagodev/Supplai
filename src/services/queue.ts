@@ -1,12 +1,52 @@
 import { createClient } from '@/lib/supabase/server';
 import { NotificationService } from '@/services/notifications';
 import { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 
 export type JobType = 'SEND_SUPPLIER_ORDER';
 
 export interface JobPayload {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
+}
+
+type JobRow = Database['public']['Tables']['jobs']['Row'];
+
+/**
+ * Error thrown by job execution that should NOT be retried (e.g. invalid email,
+ * unknown job type). Permanent failures are marked `failed` immediately instead
+ * of cycling through retries.
+ */
+export class PermanentJobError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PermanentJobError';
+  }
+}
+
+/**
+ * Decide whether a thrown error should be retried. Defaults to retriable so that
+ * transient issues (rate limits, 5xx, network/timeouts) get another attempt, while
+ * clearly permanent errors are surfaced via PermanentJobError.
+ */
+function isRetriableError(error: unknown): boolean {
+  if (error instanceof PermanentJobError) return false;
+
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+
+  // Permanent: bad recipient / validation problems are not worth retrying.
+  if (
+    message.includes('no email') ||
+    message.includes('invalid email') ||
+    message.includes('email address') ||
+    message.includes('unknown job type') ||
+    message.includes('not found')
+  ) {
+    return false;
+  }
+
+  // Everything else (rate limit, 5xx, timeout, network) is treated as retriable.
+  return true;
 }
 
 export class JobQueue {
@@ -38,62 +78,40 @@ export class JobQueue {
   }
 
   /**
-   * Process pending jobs (Fire-and-forget style for now)
-   * In a real production setup, this would be a separate worker
+   * Process a batch of pending jobs.
+   *
+   * Jobs are claimed atomically via the `claim_pending_jobs` RPC (FOR UPDATE SKIP
+   * LOCKED), so concurrent processors (the inline submit path and the cron) never
+   * pick up the same job — preventing duplicate supplier emails.
+   *
+   * @param client       Supabase client. Cron passes a service-role client; the
+   *                     inline path passes the user's session client.
+   * @param olderThanMinutes Only claim jobs older than N minutes (cron fallback).
+   * @param userId       When set, only the user's own jobs are claimed (inline path).
    */
-  static async processPending(client?: SupabaseClient) {
-    // We'll implement the processor logic here or in a separate route
-    // For now, we can call the processor directly for immediate execution
-    // but wrapped in a way that doesn't block the response if possible,
-    // or just process one batch.
-
-    // Ideally, we call an API endpoint that handles the processing
-    // fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/cron/process-jobs`, { method: 'POST' });
-
-    // For this MVP/Refactor, we will just execute the logic directly
-    // but we need to be careful about timeouts.
-    await this.processBatch(client);
-  }
-
-  /**
-   * Process a batch of pending jobs
-   */
-  static async processBatch(client?: SupabaseClient, olderThanMinutes?: number) {
+  static async processBatch(
+    client?: SupabaseClient,
+    olderThanMinutes: number = 0,
+    userId?: string
+  ) {
     const supabase = client ?? (await createClient());
 
-    // 1. Lock and fetch pending jobs
-    // Note: Supabase/Postgres doesn't have easy "SKIP LOCKED" in JS client without RPC
-    // We'll do a simple fetch for now. Concurrency might be an issue if scaled,
-    // but for now it's fine.
-    let query = supabase
-      .from('jobs')
-      .select('*')
-      .eq('status', 'pending')
-      .lt('attempts', 3) // Max attempts check
-      .limit(20); // Increased from 5 to 20 for faster processing
+    const { data: jobs, error } = await supabase.rpc('claim_pending_jobs', {
+      p_limit: 20,
+      p_older_than_minutes: olderThanMinutes,
+      p_user_id: userId ?? null,
+    });
 
-    if (olderThanMinutes) {
-      const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000).toISOString();
-      query = query.lt('created_at', cutoff);
+    if (error) {
+      console.error('Error claiming jobs:', error);
+      return;
     }
+    if (!jobs || jobs.length === 0) return;
 
-    const { data: jobs, error } = await query;
-
-    if (error || !jobs || jobs.length === 0) return;
-
-    // 2. Process each job
-    for (const job of jobs) {
+    for (const job of jobs as JobRow[]) {
       try {
-        // Mark as processing
-        await supabase
-          .from('jobs')
-          .update({ status: 'processing', updated_at: new Date().toISOString() })
-          .eq('id', job.id);
-
-        // Execute job logic based on type
         await this.executeJob(job, client);
 
-        // Mark as completed
         await supabase
           .from('jobs')
           .update({ status: 'completed', updated_at: new Date().toISOString() })
@@ -102,14 +120,14 @@ export class JobQueue {
         console.error(`Job ${job.id} failed:`, err);
 
         const newAttempts = job.attempts + 1;
-        const hasRetriesLeft = newAttempts < 3;
+        const exhausted = newAttempts >= job.max_attempts;
+        const retriable = isRetriableError(err);
 
-        // If has retries left, mark as 'pending' to retry
-        // If no retries left, mark as 'failed' permanently
         await supabase
           .from('jobs')
           .update({
-            status: hasRetriesLeft ? 'pending' : 'failed',
+            // Permanent errors or exhausted retries -> failed; otherwise back to pending.
+            status: !retriable || exhausted ? 'failed' : 'pending',
             attempts: newAttempts,
             last_error: err instanceof Error ? err.message : 'Unknown error',
             updated_at: new Date().toISOString(),
@@ -119,15 +137,15 @@ export class JobQueue {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private static async executeJob(job: any, client?: SupabaseClient) {
+  private static async executeJob(job: JobRow, client?: SupabaseClient) {
+    const payload = job.payload as JobPayload;
     switch (job.type) {
       case 'SEND_SUPPLIER_ORDER':
-        if (!job.payload.supplierOrderId) throw new Error('Missing supplierOrderId');
-        await NotificationService.sendSupplierOrder(job.payload.supplierOrderId, client);
+        if (!payload.supplierOrderId) throw new PermanentJobError('Missing supplierOrderId');
+        await NotificationService.sendSupplierOrder(payload.supplierOrderId, client);
         break;
       default:
-        throw new Error(`Unknown job type: ${job.type}`);
+        throw new PermanentJobError(`Unknown job type: ${job.type}`);
     }
   }
 }

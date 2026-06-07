@@ -102,6 +102,21 @@ export async function submitOrderUseCase(input: SubmitOrderInput): Promise<Submi
       throw new Error(`Failed to update order status: ${updateError.message}`);
     }
 
+    // 7. Send immediately (inline) instead of relying on a DB trigger. We only claim
+    // THIS user's jobs so a submit never processes another tenant's queue. The inline
+    // send recomputes the main order status on success. It is best-effort: any failure
+    // is left pending for the Cloudflare cron to retry, so we don't fail the submission.
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        await JobQueue.processBatch(supabase, 0, user.id);
+      }
+    } catch (inlineError) {
+      console.error('[SubmitOrderUseCase] Inline send failed, leaving for cron:', inlineError);
+    }
+
     return {
       success: true,
       supplierOrdersCreated: supplierOrders.length,

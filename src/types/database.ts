@@ -531,6 +531,14 @@ export type Database = {
         | { Args: { invitation_token: string }; Returns: string };
       archive_old_order_items: { Args: never; Returns: number };
       can_access_order: { Args: { order_id: string }; Returns: boolean };
+      claim_pending_jobs: {
+        Args: {
+          p_limit?: number;
+          p_older_than_minutes?: number;
+          p_user_id?: string | null;
+        };
+        Returns: Database['public']['Tables']['jobs']['Row'][];
+      };
       create_organization_with_membership:
         | {
             Args: { org_name: string; org_slug: string; user_email: string };

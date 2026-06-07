@@ -1,14 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Groq from 'groq-sdk';
 
-if (!process.env.GROQ_API_KEY) {
-  console.warn('Missing GROQ_API_KEY environment variable');
-}
+// Lazily create the client on first use. On the Workers runtime (workerd), env vars
+// are only reliably available at request time, not at module-import time.
+let cachedGroq: Groq | null = null;
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-  timeout: 45000, // 45 seconds (less than frontend 60s timeout)
-});
+function getGroq(): Groq {
+  if (cachedGroq) return cachedGroq;
+  if (!process.env.GROQ_API_KEY) {
+    console.warn('Missing GROQ_API_KEY environment variable');
+  }
+  cachedGroq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+    timeout: 45000, // 45 seconds (less than frontend 60s timeout)
+  });
+  return cachedGroq;
+}
 
 export interface TranscriptionResult {
   text: string;
@@ -29,7 +36,7 @@ export interface TranscriptionResult {
 export async function transcribeAudio(audioFile: File): Promise<TranscriptionResult> {
   return withRetry(async () => {
     try {
-      const transcription = await groq.audio.transcriptions.create({
+      const transcription = await getGroq().audio.transcriptions.create({
         file: audioFile,
         model: 'whisper-large-v3',
         language: 'es', // Force Spanish

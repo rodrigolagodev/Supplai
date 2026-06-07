@@ -38,16 +38,21 @@ describe('Gemini AI - Order Parsing', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject invalid unit', () => {
+    it('should normalize an invalid unit to "units" instead of rejecting', () => {
+      // The schema intentionally normalizes unknown units (graceful AI parsing)
+      // rather than failing, so a malformed unit never blocks an order.
       const invalidItem = {
         product: 'Tomate',
         quantity: 2.5,
-        unit: 'invalid_unit', // Unit inválida
+        unit: 'invalid_unit',
         confidence: 0.95,
       };
 
       const result = ParsedItemSchema.safeParse(invalidItem);
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.unit).toBe('units');
+      }
     });
 
     it('should reject confidence out of range', () => {
@@ -99,7 +104,7 @@ describe('Gemini AI - Order Parsing', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject if items array contains invalid item', () => {
+    it('should normalize an invalid unit inside the items array', () => {
       const invalidResult = {
         items: [
           {
@@ -112,7 +117,10 @@ describe('Gemini AI - Order Parsing', () => {
       };
 
       const result = ParseResultSchema.safeParse(invalidResult);
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.items[0]?.unit).toBe('units');
+      }
     });
   });
 

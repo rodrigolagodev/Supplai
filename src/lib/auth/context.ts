@@ -25,40 +25,9 @@ export async function getAuthedContext(organizationId?: string): Promise<AuthedC
     throw new Error('Unauthorized');
   }
 
-  // If no organizationId is provided, we just return the user and supabase client
-  // We mock a membership for now or we could fetch the default one if needed.
-  // But for most actions we need a specific organization context.
-  // If organizationId is NOT provided, we can't return a valid membership for a specific org.
-  // However, the type definition implies we always return a membership.
-  // Let's adjust the logic: if organizationId is provided, we enforce it.
-  // If not, we might need to fetch the user's "current" or "default" organization,
-  // or just return null for membership if the type allows.
-
-  // For this project's specific pattern seen in actions.ts, most actions operate on an organizationId
-  // (derived from order or passed directly).
-
+  // This helper validates membership against a specific organization. Callers that
+  // only have an order id should use getOrderContext, which resolves the org first.
   if (!organizationId) {
-    // If we don't have an org ID, we can't validate membership.
-    // But we can't return a full AuthedContext as defined above.
-    // Let's fetch the first membership found for the user to satisfy the type,
-    // or we should make membership optional in the return type.
-    // Given the strictness of the current code, let's make membership optional in the return type
-    // OR throw if organizationId is missing but required by the caller (implicit).
-
-    // Actually, let's look at how it's used.
-    // Most times we query membership by user_id and organization_id.
-
-    // Let's fetch ANY membership to ensure the user is at least part of the system?
-    // No, that's not secure enough for specific actions.
-
-    // Let's change the signature to require organizationId if we want membership.
-    // But wait, some actions might look up the order first to get the organizationId.
-    // So the flow is:
-    // 1. Get User
-    // 2. Get Order -> Get Org ID
-    // 3. Check Membership
-
-    // So this helper might be best used *after* we have the Org ID.
     throw new Error('Organization ID is required to verify membership');
   }
 
@@ -123,6 +92,19 @@ export async function getOrderContext(orderId: string) {
     supabase,
   };
 }
+
+/**
+ * Map an error thrown by the auth-context helpers to an HTTP status code, so API
+ * routes can return the right status without re-implementing the auth checks.
+ */
+export function authErrorStatus(error: unknown): number {
+  const message = error instanceof Error ? error.message : '';
+  if (message === 'Unauthorized') return 401;
+  if (message === 'Forbidden') return 403;
+  if (message.includes('not found')) return 404;
+  return 500;
+}
+
 /**
  * Helper to get organization context and verify access.
  * Useful for pages/actions that operate on an organization level.

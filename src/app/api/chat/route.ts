@@ -1,46 +1,24 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@/lib/supabase/server';
+import { getOrderContext, authErrorStatus } from '@/lib/auth/context';
 import { saveConversationMessage } from '@/features/orders/actions/process-message';
 import { CONVERSATIONAL_SYSTEM_PROMPT } from '@/lib/ai/prompts';
+import { logError, logInfo } from '@/lib/utils/logging';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function POST(req: Request) {
+  // Create the AI client lazily: on workerd, env is only available at request time.
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
   const body = await req.json();
   const { messages, orderId } = body;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  // Verify access to order
-  const { data: order } = await supabase
-    .from('orders')
-    .select('organization_id')
-    .eq('id', orderId)
-    .single();
-
-  if (!order) {
-    return new Response('Order not found', { status: 404 });
-  }
-
-  const { data: membership } = await supabase
-    .from('memberships')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('organization_id', order.organization_id)
-    .single();
-
-  if (!membership) {
-    return new Response('Forbidden', { status: 403 });
+  // Verify auth + order access + membership in one place.
+  let user, order, supabase;
+  try {
+    ({ user, order, supabase } = await getOrderContext(orderId));
+  } catch (error) {
+    return new Response((error as Error).message, { status: authErrorStatus(error) });
   }
 
   if (!messages || !Array.isArray(messages)) {
@@ -154,11 +132,6 @@ INSTRUCCIONES ADICIONALES:
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
-    // DEBUG: Always log the full error to understand why it persists
-    console.error('DEBUG - Gemini Full Error:', JSON.stringify(error, null, 2));
-    console.error('DEBUG - Error Message:', error.message);
-    console.error('DEBUG - Error Status:', error.status);
-
     const isQuotaError =
       error?.status === 429 ||
       error?.status === 503 ||
@@ -166,18 +139,13 @@ INSTRUCCIONES ADICIONALES:
       error?.message?.includes('quota');
 
     if (isQuotaError) {
-      console.warn('Gemini API Quota Exceeded (429) - returning friendly error');
+      logInfo('chat', 'Gemini quota/overload, returning friendly error');
     } else {
-      console.error('Gemini API Error:', error);
+      logError('chat', 'Gemini API error', error);
     }
 
-    // Check for quota exceeded (429) or overloaded (503)
-    if (
-      error?.status === 429 ||
-      error?.status === 503 ||
-      error?.message?.includes('429') ||
-      error?.message?.includes('quota')
-    ) {
+    // Quota exceeded (429) or overloaded (503): tell the client to retry.
+    if (isQuotaError) {
       return new Response(
         JSON.stringify({
           error: 'quota_exceeded',

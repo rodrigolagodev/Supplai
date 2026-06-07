@@ -1,85 +1,134 @@
-# Production Deployment Guide
+# Deployment Guide — Cloudflare Workers (OpenNext)
 
-This guide will help you configure your production environment correctly.
+Supplai is deployed to **Cloudflare Workers** via the [OpenNext](https://opennext.js.org/cloudflare)
+adapter, under the domain **`supplai.rlago.com`**. Supabase (auth, DB, storage) and Resend (email)
+are unchanged by the hosting platform. Everything below runs on **Workers free** ($0/mo).
 
-## Step 1: Configure Vercel Environment Variable
+> All steps marked **[you]** require your accounts/credentials and are done once.
 
-1. Go to your Vercel project: https://vercel.com/your-team/supplai
-2. Navigate to: **Settings** → **Environment Variables**
-3. Add a new environment variable:
-   - **Name**: `NEXT_PUBLIC_SITE_URL`
-   - **Key**: `NEXT_PUBLIC_SITE_URL`
-   - **Value**: `https://supplai-web.vercel.app` (or your custom domain)
-   - **Environment**: Select **Production**, **Preview**, and **Development**
-4. Click **Save**
+---
 
-## Step 2: Configure Supabase Redirect URLs
+## 0. Rotate the leaked Supabase service key (do this first) **[you]**
 
-1. Go to your Supabase project dashboard
-2. Navigate to: **Authentication** → **URL Configuration**
-3. Update the following settings:
+A previous commit (`2ac407f`) committed the Supabase `service_role` key in a DB trigger
+(now removed). Treat it as compromised:
 
-   **Site URL**:
+1. Supabase Dashboard → **Settings → API → service_role** → **Reset / Roll**.
+2. Use the new key only as a Worker secret (step 3) — never in the repo.
 
-   ```
-   https://supplai-web.vercel.app
-   ```
+---
 
-   **Redirect URLs** (add all of these):
+## 1. Apply the database migrations **[you]**
 
-   ```
-   https://supplai-web.vercel.app/auth/callback
-   https://supplai-web.vercel.app/auth/confirm
-   http://localhost:3000/auth/callback
-   http://localhost:3000/auth/confirm
-   ```
+```bash
+supabase db push   # or apply supabase/migrations/* via the dashboard
+```
 
-4. Click **Save**
+New migrations in this change:
 
-## Step 3: Redeploy Your Application
+- `20260607000001_drop_email_queue_trigger.sql` — removes the `pg_net` trigger + leaked key.
+- `20260607000002_create_claim_pending_jobs.sql` — atomic job claiming (no duplicate emails).
+- `20260607000003_fix_jobs_rls.sql` — removes the contradictory `WITH CHECK (true)` policy.
 
-After setting the environment variable in Vercel:
+---
 
-1. Go to your Vercel project **Deployments** tab
-2. Find the latest deployment
-3. Click the **•••** menu → **Redeploy**
-4. Ensure "Use existing Build Cache" is **unchecked**
-5. Click **Redeploy**
+## 2. Verify a sending domain in Resend **[you]**
 
-## Step 4: Test Email Confirmation
+Supplier emails will NOT deliver from the `resend.dev` sandbox in production.
 
-1. Wait for deployment to complete
-2. Go to: https://supplai-web.vercel.app/register
-3. Register with a new email address
-4. Check your email
-5. Verify the confirmation link now points to `https://supplai-web.vercel.app` (not localhost)
-6. Click the link and confirm it works
+1. Resend → **Domains** → add `rlago.com` (or `mail.rlago.com`).
+2. Add the DKIM / SPF / (DMARC) records Resend shows you into **Cloudflare DNS** (DNS-only / grey cloud).
+3. Set `EMAIL_FROM` (step 3) to an address on that domain, e.g. `Supplai <orders@rlago.com>`.
+
+---
+
+## 3. Create the Worker & set secrets **[you]**
+
+```bash
+pnpm install
+wrangler login
+
+# Secrets (never committed):
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # the NEW rotated key
+wrangler secret put GROQ_API_KEY
+wrangler secret put GEMINI_API_KEY
+wrangler secret put RESEND_API_KEY
+wrangler secret put EMAIL_FROM                  # e.g. Supplai <orders@rlago.com>
+wrangler secret put CRON_SECRET                 # openssl rand -base64 32
+```
+
+Public build-time vars (set in **Workers Builds → Build variables**; they must exist at build time):
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_SITE_URL=https://supplai.rlago.com
+```
+
+---
+
+## 4. Build & deploy
+
+```bash
+pnpm preview   # builds + runs in the workerd runtime locally — VALIDATE HERE FIRST
+pnpm deploy    # builds + deploys to Cloudflare
+```
+
+`pnpm preview` is the most important local check: it runs the real `workerd` runtime, so it catches
+runtime-only issues (env access, the PWA service worker, streaming) that `next dev` does not.
+
+The build uses webpack (`next build --webpack`) because the PWA plugin (`@serwist/next`) requires it;
+OpenNext invokes the `build` script, so this is automatic.
+
+---
+
+## 5. Custom domain **[you]**
+
+Cloudflare Dashboard → your Worker → **Settings → Domains & Routes → Add Custom Domain** →
+`supplai.rlago.com`. Cloudflare creates the DNS record automatically.
+
+---
+
+## 6. Supabase Auth redirect URLs **[you]**
+
+Supabase → **Authentication → URL Configuration**:
+
+- **Site URL**: `https://supplai.rlago.com`
+- **Redirect URLs**:
+  ```
+  https://supplai.rlago.com/auth/callback
+  https://supplai.rlago.com/auth/confirm
+  http://localhost:3000/auth/callback
+  http://localhost:3000/auth/confirm
+  ```
+
+---
+
+## Background job processing (email queue)
+
+- **Happy path:** when an order is submitted, emails are sent **inline** in the submit server action
+  (`SubmitOrderUseCase`) — instant, no DB trigger.
+- **Fallback:** a **Cloudflare Cron Trigger** (`*/3 * * * *`, in `wrangler.jsonc`) runs `scheduled()`
+  in `worker.ts`, which calls the internal `/api/cron/process-jobs` route to retry any jobs left
+  pending (rate limits / transient failures).
+- Jobs are claimed atomically (`claim_pending_jobs` RPC) and sends are idempotent, so the inline path
+  and the cron can never produce a duplicate supplier email.
+
+Trigger processing manually:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://supplai.rlago.com/api/cron/process-jobs
+```
+
+---
 
 ## Troubleshooting
 
-**Issue**: Email still points to localhost
-
-- **Solution**: Make sure you redeployed AFTER setting the environment variable
-- Check that the environment variable is set in the correct environment (Production)
-
-**Issue**: "Access denied" error when clicking email link
-
-- **Solution**: Verify all redirect URLs are configured correctly in Supabase
-- The URL must match exactly (including https://)
-
-**Issue**: Link works but shows "Email link has expired"
-
-- **Solution**: The link expires after a short time (5-10 minutes)
-- Request a new confirmation email by registering again with a different email
-
-## Step 5: Configure GitHub Actions (for Cron Jobs)
-
-To ensure the cron jobs work correctly, you must set the following **Repository Variable** in GitHub:
-
-1.  Go to your GitHub repository **Settings**
-2.  Navigate to: **Secrets and variables** → **Actions** → **Variables** tab (NOT Secrets)
-3.  Click **New repository variable**
-4.  Add:
-    - **Name**: `NEXT_PUBLIC_SITE_URL`
-    - **Value**: `https://supplai-web.vercel.app`
-5.  Click **Add variable**
+- **Emails not delivered:** the Resend domain isn't verified, or `EMAIL_FROM` isn't on the verified
+  domain. Check Resend → Emails for the failure reason.
+- **Auth link points to localhost / "access denied":** `NEXT_PUBLIC_SITE_URL` or the Supabase redirect
+  URLs are wrong. They must match `https://supplai.rlago.com` exactly.
+- **500 on first request after deploy:** usually a missing secret — confirm all `wrangler secret put`
+  values are set.
+- **PWA not installing / stale content:** re-validate with `pnpm preview`; the SW is emitted to
+  `public/sw.js` by serwist at build time and disabled in development.

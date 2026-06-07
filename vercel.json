@@ -1,9 +1,0 @@
-{
-  "buildCommand": "pnpm build --webpack",
-  "crons": [
-    {
-      "path": "/api/cron/process-jobs",
-      "schedule": "0 12 * * *"
-    }
-  ]
-}

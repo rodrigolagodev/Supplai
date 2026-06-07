@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { JobQueue } from '@/services/queue';
+import { processJobsCron } from '@/services/cron';
 
 /**
  * API Route para procesar jobs pendientes
@@ -43,32 +42,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
-    // Procesar jobs pendientes (Fallback: solo jobs > 1 minuto)
-    // Esto permite reintentar rate limits rápidamente
-    console.log('[Cron] Starting job processing (Fallback mode)...');
-    await JobQueue.processBatch(supabaseAdmin, 1);
-    console.log('[Cron] Job processing completed');
-
-    // Cleanup empty draft orders (older than 7 days)
-    console.log('[Cron] Starting draft cleanup...');
-    const { cleanupEmptyDrafts } = await import('@/features/orders/actions/sync-orders');
-    const cleanupResult = await cleanupEmptyDrafts(supabaseAdmin, 7);
-    console.log(`[Cron] Draft cleanup completed: ${cleanupResult.deletedCount} orders deleted`);
+    const result = await processJobsCron(supabaseUrl, supabaseServiceKey, 1);
 
     return NextResponse.json({
       success: true,
       message: 'Jobs processed successfully',
       timestamp: new Date().toISOString(),
       cleanup: {
-        deletedDrafts: cleanupResult.deletedCount,
-        errors: cleanupResult.errors.length > 0 ? cleanupResult.errors : undefined,
+        deletedDrafts: result.deletedDrafts,
+        errors: result.cleanupErrors.length > 0 ? result.cleanupErrors : undefined,
       },
     });
   } catch (error) {

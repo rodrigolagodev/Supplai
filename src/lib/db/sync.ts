@@ -41,22 +41,26 @@ export async function syncPendingItems() {
 
   if (allCandidateOrders.length > 0) {
     try {
-      // Filter orders: only sync if they have at least one item OR message
+      // Filter orders: only sync if they have at least one item OR message.
+      // Compute the local (IndexedDB) counts in parallel rather than one-by-one.
       const ordersToSync: typeof allCandidateOrders = [];
       const emptyOrders: typeof allCandidateOrders = [];
 
-      for (const order of allCandidateOrders) {
-        const itemCount = await db.orderItems.where('order_id').equals(order.id).count();
-        const messageCount = await db.messages.where('order_id').equals(order.id).count();
+      const counts = await Promise.all(
+        allCandidateOrders.map(async order => ({
+          order,
+          itemCount: await db.orderItems.where('order_id').equals(order.id).count(),
+          messageCount: await db.messages.where('order_id').equals(order.id).count(),
+        }))
+      );
 
+      for (const { order, itemCount, messageCount } of counts) {
         // Sync if it has items OR messages (active conversation)
         if (itemCount > 0 || messageCount > 0) {
           ordersToSync.push(order);
-        } else {
+        } else if (order.sync_status === 'pending') {
           // Only mark as empty if it's strictly pending (don't touch already synced ones)
-          if (order.sync_status === 'pending') {
-            emptyOrders.push(order);
-          }
+          emptyOrders.push(order);
         }
       }
 
