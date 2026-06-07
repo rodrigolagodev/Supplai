@@ -89,7 +89,7 @@ export async function syncPendingItems() {
         await Promise.all(
           emptyOrders.map(order => db.orders.update(order.id, { sync_status: 'synced' }))
         );
-        console.warn(`Skipped syncing ${emptyOrders.length} empty draft(s) to Supabase`);
+        // Empty drafts are intentionally not synced; no need to log this normal case.
       }
     } catch (error) {
       console.error('Failed to batch sync orders:', error);
