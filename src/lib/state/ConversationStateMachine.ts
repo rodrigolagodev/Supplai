@@ -36,11 +36,13 @@ export class ConversationStateMachine {
       AI_CALL_STARTED: 'ai_processing',
     },
     typing: {
+      USER_STARTED_TYPING: 'typing', // Idempotent: still typing (fired on every keystroke)
       USER_STOPPED_TYPING: 'idle',
       USER_STARTED_RECORDING: 'recording', // Cancel typing
       MESSAGE_QUEUED: 'sending_message',
     },
     recording: {
+      USER_STARTED_RECORDING: 'recording', // Idempotent: still recording
       USER_STOPPED_RECORDING: 'idle',
       USER_STARTED_TYPING: 'typing', // Cancel recording
       MESSAGE_QUEUED: 'sending_message',
@@ -57,6 +59,7 @@ export class ConversationStateMachine {
       ERROR_OCCURRED: 'error',
     },
     ai_streaming: {
+      AI_RESPONSE_STREAMING: 'ai_streaming', // Idempotent: fired on every streamed chunk
       AI_RESPONSE_COMPLETE: 'idle',
       USER_STARTED_TYPING: 'typing', // Cancel streaming
       USER_STARTED_RECORDING: 'recording', // Cancel streaming
@@ -72,9 +75,17 @@ export class ConversationStateMachine {
   transition(event: ConversationEvent): boolean {
     const nextState = this.transitions[this.state]?.[event.type];
 
+    // Events are dispatched optimistically by the UI (e.g. USER_STARTED_TYPING on
+    // every keystroke, USER_STOPPED_RECORDING even when not recording). Unhandled
+    // events are an intentional no-op guard — not an error — so we don't log them.
     if (!nextState) {
-      console.warn(`Invalid transition: ${this.state} + ${event.type}`);
       return false;
+    }
+
+    // Idempotent self-transition: stay put without notifying listeners (avoids
+    // redundant work when the same event repeats, e.g. streamed AI chunks).
+    if (nextState === this.state) {
+      return true;
     }
 
     this.onExit(this.state, event);
