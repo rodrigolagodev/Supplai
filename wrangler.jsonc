@@ -18,7 +18,23 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  // Rate limiting for auth endpoints (brute-force protection).
+  // The Workers Rate Limiting API only accepts period 10 or 60 (seconds).
+  // IP limiter blocks classic brute force; email limiter blocks distributed attacks
+  // against a single account.
+  "ratelimits": [
+    {
+      "name": "AUTH_IP_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 5, "period": 60 }
+    },
+    {
+      "name": "AUTH_EMAIL_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 5, "period": 60 }
+    }
+  ]
   // Secrets (set with `wrangler secret put`, never committed):
   //   SUPABASE_SERVICE_ROLE_KEY, GROQ_API_KEY, GEMINI_API_KEY, RESEND_API_KEY,
   //   EMAIL_FROM, CRON_SECRET

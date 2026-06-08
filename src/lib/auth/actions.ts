@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { checkAuthRateLimit } from './rate-limit';
 
 /**
  * Get the base URL for the application
@@ -25,6 +26,11 @@ export interface AuthActionResult {
  * Sign in with email and password
  */
 export async function signIn(email: string, password: string): Promise<AuthActionResult> {
+  const rl = await checkAuthRateLimit('login', email);
+  if (!rl.allowed) {
+    return { success: false, error: rl.error };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -61,6 +67,11 @@ export async function signUp(
       success: false,
       error: 'El registro está deshabilitado. Necesitas una invitación para crear una cuenta.',
     };
+  }
+
+  const rl = await checkAuthRateLimit('signup', email);
+  if (!rl.allowed) {
+    return { success: false, error: rl.error };
   }
 
   const invitation = await getInvitationByToken(invitationToken);
@@ -127,6 +138,11 @@ export async function signOut(): Promise<never> {
  * Request password reset email
  */
 export async function resetPassword(email: string): Promise<AuthActionResult> {
+  const rl = await checkAuthRateLimit('reset', email);
+  if (!rl.allowed) {
+    return { success: false, error: rl.error };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
