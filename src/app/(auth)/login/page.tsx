@@ -24,13 +24,6 @@ export default function LoginPage() {
         <LoginForm />
       </Suspense>
 
-      <div className="text-center text-sm">
-        <span className="text-gray-600">¿No tienes cuenta? </span>
-        <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-          Regístrate
-        </Link>
-      </div>
-
       <div className="text-center">
         <Link href="/forgot-password" className="text-sm text-gray-600 hover:text-gray-500">
           ¿Olvidaste tu contraseña?

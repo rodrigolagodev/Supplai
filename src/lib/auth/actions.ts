@@ -43,10 +43,12 @@ export async function signIn(email: string, password: string): Promise<AuthActio
   return { success: true };
 }
 
-import { acceptInvitation } from '@/lib/organizations/actions';
+import { acceptInvitation, getInvitationByToken } from '@/lib/organizations/actions';
 
 /**
- * Sign up with email, password, and full name
+ * Sign up with email, password, and full name.
+ *
+ * Open registration is currently disabled: a valid invitation token is required.
  */
 export async function signUp(
   email: string,
@@ -54,6 +56,21 @@ export async function signUp(
   fullName: string,
   invitationToken?: string
 ): Promise<AuthActionResult> {
+  if (!invitationToken) {
+    return {
+      success: false,
+      error: 'El registro está deshabilitado. Necesitas una invitación para crear una cuenta.',
+    };
+  }
+
+  const invitation = await getInvitationByToken(invitationToken);
+  if (!invitation || !invitation.is_valid) {
+    return {
+      success: false,
+      error: 'La invitación no es válida o ha expirado.',
+    };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signUp({

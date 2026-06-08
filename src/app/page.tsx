@@ -21,20 +21,12 @@ export default async function Home() {
             Ir al Dashboard
           </Link>
         ) : (
-          <>
-            <Link
-              href="/login"
-              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-500 transition-colors"
-            >
-              Iniciar Sesión
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Registrarse
-            </Link>
-          </>
+          <Link
+            href="/login"
+            className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-500 transition-colors"
+          >
+            Iniciar Sesión
+          </Link>
         )}
       </div>
     </main>
